@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 580" role="img" aria-label="Component diagram with four layers: Channels, Compute, Storage, Intelligence — each with the components and responsibilities of the On-Call Assistant.">
+  <defs>
+    <style><![CDATA[
+      .layer  { font: 700 12px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #475569; letter-spacing: 0.18em; }
+      .h      { font: 700 16px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #0f172a; }
+      .h2     { font: 700 14px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #ffffff; }
+      .sub    { font: 500 12.5px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #475569; }
+      .subw   { font: 500 12px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #f1d6ff; }
+      .pill   { font: 600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1e293b; }
+      .arrow  { stroke: #94a3b8; stroke-width: 1.4; stroke-dasharray: 4 4; fill: none; }
+    ]]></style>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/></marker>
+  </defs>
+
+  <rect width="1200" height="580" fill="#ffffff"/>
+
+  <!-- ── Layer rail labels ──────────────────────────────────────── -->
+  <text x="80" y="80" class="layer" text-anchor="middle">CHANNELS</text>
+  <text x="80" y="210" class="layer" text-anchor="middle">COMPUTE</text>
+  <text x="80" y="350" class="layer" text-anchor="middle">STORAGE</text>
+  <text x="80" y="480" class="layer" text-anchor="middle">INTELLIGENCE</text>
+
+  <!-- ── Channels Layer ─────────────────────────────────────────── -->
+  <rect x="160" y="50" width="1010" height="100" rx="12" fill="#faf5ff" stroke="#a855f7" stroke-width="1.4"/>
+
+  <rect x="180" y="70" width="305" height="60" rx="8" fill="#4A154B"/>
+  <text x="333" y="92" class="h2" text-anchor="middle">Slack Events API</text>
+  <text x="333" y="112" class="subw" text-anchor="middle">message.channels</text>
+  <text x="333" y="126" class="subw" text-anchor="middle">app_mention</text>
+
+  <rect x="500" y="70" width="305" height="60" rx="8" fill="#4A154B"/>
+  <text x="652" y="92" class="h2" text-anchor="middle">Slack Web API</text>
+  <text x="652" y="112" class="subw" text-anchor="middle">chat.postMessage</text>
+  <text x="652" y="126" class="subw" text-anchor="middle">in-thread reply</text>
+
+  <rect x="820" y="70" width="335" height="60" rx="8" fill="#4A154B"/>
+  <text x="987" y="92" class="h2" text-anchor="middle">Bot User · @oncall-assistant</text>
+  <text x="987" y="112" class="subw" text-anchor="middle">scopes: channels:history</text>
+  <text x="987" y="126" class="subw" text-anchor="middle">chat:write · app_mentions:read</text>
+
+  <!-- ── Compute Layer ──────────────────────────────────────────── -->
+  <rect x="160" y="170" width="1010" height="120" rx="12" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.4"/>
+
+  <!-- Ingest Lambda card -->
+  <rect x="180" y="190" width="475" height="84" rx="10" fill="#ffffff" stroke="#FF9900" stroke-width="2"/>
+  <text x="200" y="214" class="h">Ingest Lambda · Function URL</text>
+  <text x="200" y="234" class="sub">Merges all replies on a Slack thread into one document.</text>
+  <rect x="200" y="246" width="120" height="20" rx="4" fill="#fef3c7"/>
+  <text x="260" y="260" class="pill" text-anchor="middle">key=thread_ts</text>
+  <rect x="328" y="246" width="118" height="20" rx="4" fill="#fef3c7"/>
+  <text x="387" y="260" class="pill" text-anchor="middle">idempotent put</text>
+  <rect x="454" y="246" width="148" height="20" rx="4" fill="#fef3c7"/>
+  <text x="528" y="260" class="pill" text-anchor="middle">start_ingestion_job</text>
+
+  <!-- Query Lambda card -->
+  <rect x="675" y="190" width="475" height="84" rx="10" fill="#ffffff" stroke="#FF9900" stroke-width="2"/>
+  <text x="695" y="214" class="h">Query Lambda · Function URL</text>
+  <text x="695" y="234" class="sub">Routes engineer questions to Bedrock KB and posts the reply.</text>
+  <rect x="695" y="246" width="118" height="20" rx="4" fill="#fef3c7"/>
+  <text x="754" y="260" class="pill" text-anchor="middle">strip mention</text>
+  <rect x="821" y="246" width="174" height="20" rx="4" fill="#fef3c7"/>
+  <text x="908" y="260" class="pill" text-anchor="middle">retrieve_and_generate</text>
+  <rect x="1003" y="246" width="124" height="20" rx="4" fill="#fef3c7"/>
+  <text x="1065" y="260" class="pill" text-anchor="middle">post in-thread</text>
+
+  <!-- ── Storage Layer ──────────────────────────────────────────── -->
+  <rect x="160" y="310" width="1010" height="100" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="1.4"/>
+
+  <rect x="180" y="330" width="475" height="68" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+  <text x="200" y="354" class="h">Amazon S3 · events bucket</text>
+  <text x="200" y="374" class="sub">events/{channel_id}/{thread_ts}.json · versioned · AES-256</text>
+  <text x="200" y="392" class="sub">Source-of-truth for KB; idempotent re-ingest.</text>
+
+  <rect x="675" y="330" width="475" height="68" rx="10" fill="#ffffff" stroke="#6366f1" stroke-width="1.6"/>
+  <text x="695" y="354" class="h">Amazon S3 Vectors · vector index</text>
+  <text x="695" y="374" class="sub">1024-dim · cosine similarity · KB-managed lifecycle</text>
+  <text x="695" y="392" class="sub">Chosen over OpenSearch Serverless on PoC cost.</text>
+
+  <!-- ── Intelligence Layer ─────────────────────────────────────── -->
+  <rect x="160" y="430" width="1010" height="120" rx="12" fill="#ecfdf5" stroke="#047857" stroke-width="1.4"/>
+
+  <rect x="180" y="450" width="305" height="84" rx="10" fill="#ffffff" stroke="#047857" stroke-width="2"/>
+  <text x="333" y="476" class="h" text-anchor="middle">Bedrock Knowledge Base</text>
+  <text x="333" y="498" class="sub" text-anchor="middle">orchestrates chunk · embed</text>
+  <text x="333" y="516" class="sub" text-anchor="middle">retrieve · prompt</text>
+
+  <rect x="500" y="450" width="305" height="84" rx="10" fill="#ffffff" stroke="#047857" stroke-width="1.6"/>
+  <text x="652" y="476" class="h" text-anchor="middle">Titan Text Embeddings V2</text>
+  <text x="652" y="498" class="sub" text-anchor="middle">1024-dim · index-time</text>
+  <text x="652" y="516" class="sub" text-anchor="middle">vectorizes thread documents</text>
+
+  <rect x="820" y="450" width="335" height="84" rx="10" fill="#ffffff" stroke="#047857" stroke-width="1.6"/>
+  <text x="987" y="476" class="h" text-anchor="middle">Amazon Nova Lite</text>
+  <text x="987" y="498" class="sub" text-anchor="middle">query-time generation · grounded only</text>
+  <text x="987" y="516" class="sub" text-anchor="middle">≤ 5 bullets · no free synthesis</text>
+
+  <!-- ── Cross-layer flow arrows (subtle) ───────────────────────── -->
+  <path d="M 410 150 L 410 188" class="arrow" marker-end="url(#arrG)"/>
+  <path d="M 912 150 L 912 188" class="arrow" marker-end="url(#arrG)"/>
+  <path d="M 410 274 L 410 328" class="arrow" marker-end="url(#arrG)"/>
+  <path d="M 912 274 L 912 328" class="arrow" marker-end="url(#arrG)"/>
+  <path d="M 410 398 L 333 448" class="arrow" marker-end="url(#arrG)"/>
+  <path d="M 912 398 L 987 448" class="arrow" marker-end="url(#arrG)"/>
+</svg>

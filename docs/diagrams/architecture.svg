@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1360 580" role="img" aria-label="On-Call Assistant architecture: Slack channel, API Gateway HTTP API with /events and /query routes, Ingest and Query Lambda Function URLs, Amazon S3, Bedrock Knowledge Base hub, Titan V2 embeddings, S3 Vectors index, and Nova Lite generation.">
+  <defs>
+    <style><![CDATA[
+      .h     { font: 700 15px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #0f172a; }
+      .lbl   { font: 600 13.5px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #0f172a; }
+      .sub   { font: 500 12px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #475569; }
+      .grp   { font: 700 11.5px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #475569; letter-spacing: 0.18em; }
+      .edge  { font: 600 11.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1e293b; }
+      .edgeBg{ fill: #ffffff; opacity: 0.92; }
+      .ingest{ stroke: #2563eb; }
+      .query { stroke: #047857; }
+    ]]></style>
+    <marker id="arrInk" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0f172a"/></marker>
+    <marker id="arrIng" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="arrQry" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#047857"/></marker>
+  </defs>
+
+  <rect width="1360" height="580" style="fill:#ffffff"/>
+
+  <!-- ── Zone backgrounds ─────────────────────────────────────────── -->
+  <rect x="20"  y="60" width="200" height="450" rx="14" fill="#faf5ff" stroke="#a855f7" stroke-dasharray="4 3" stroke-width="1.2"/>
+  <text x="120" y="82" class="grp" text-anchor="middle">SLACK</text>
+
+  <!-- AWS Compute zone expanded left to include API GW -->
+  <rect x="235" y="60" width="455" height="450" rx="14" fill="#fffbeb" stroke="#f59e0b" stroke-dasharray="4 3" stroke-width="1.2"/>
+  <text x="462" y="82" class="grp" text-anchor="middle">AWS · COMPUTE</text>
+
+  <rect x="705" y="60" width="635" height="450" rx="14" fill="#ecfdf5" stroke="#047857" stroke-dasharray="4 3" stroke-width="1.2"/>
+  <text x="1022" y="82" class="grp" text-anchor="middle">AWS · RAG CORE</text>
+
+  <!-- ── Slack tall box ───────────────────────────────────────────── -->
+  <rect x="40" y="120" width="160" height="370" rx="10" fill="#4A154B"/>
+  <text x="120" y="148" class="lbl" style="fill:#ffffff" text-anchor="middle">#warchan</text>
+  <text x="120" y="170" class="sub" style="fill:#ffffff" text-anchor="middle">PagerDuty alerts</text>
+  <text x="120" y="188" class="sub" style="fill:#ffffff" text-anchor="middle">human replies</text>
+
+  <line x1="60" y1="220" x2="180" y2="220" stroke="#a855f7" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <text x="120" y="248" class="lbl" style="fill:#ffffff" text-anchor="middle">Engineer</text>
+  <text x="120" y="270" class="sub" style="fill:#ffffff" text-anchor="middle">@oncall-assistant</text>
+  <text x="120" y="288" class="sub" style="fill:#ffffff" text-anchor="middle">free-form question</text>
+
+  <line x1="60" y1="320" x2="180" y2="320" stroke="#a855f7" stroke-width="1" stroke-dasharray="3 3"/>
+
+  <text x="120" y="350" class="lbl" style="fill:#ffffff" text-anchor="middle">↳ thread</text>
+  <text x="120" y="372" class="sub" style="fill:#ffffff" text-anchor="middle">bot reply lands here</text>
+  <circle cx="120" cy="410" r="14" fill="#2563eb"/>
+  <text x="120" y="415" class="sub" style="fill:#ffffff" text-anchor="middle">bot</text>
+  <text x="120" y="450" class="sub" style="fill:#ffffff" text-anchor="middle">≤ 5 grounded bullets</text>
+  <text x="120" y="470" class="sub" style="fill:#ffffff" text-anchor="middle">with citations</text>
+
+  <!-- ── API Gateway HTTP API ────────────────────────────────────── -->
+  <rect x="248" y="257" width="134" height="96" rx="12" fill="#fdf4ff" stroke="#7c3aed" stroke-width="2.2"/>
+  <text x="315" y="278" class="h" text-anchor="middle" style="font-size:14px;">API Gateway</text>
+  <text x="315" y="295" class="sub" text-anchor="middle">HTTP API</text>
+  <line x1="260" y1="303" x2="370" y2="303" stroke="#e9d5ff" stroke-width="1"/>
+  <text x="315" y="319" class="edge" text-anchor="middle" style="fill:#7c3aed; font-size:11px;">POST /events</text>
+  <text x="315" y="337" class="edge" text-anchor="middle" style="fill:#7c3aed; font-size:11px;">POST /query</text>
+
+  <!-- ── Ingest Lambda (shifted +165 from original x=270) ────────── -->
+  <rect x="435" y="160" width="230" height="80" rx="12" style="fill:#ffffff" stroke="#FF9900" stroke-width="2.4"/>
+  <text x="550" y="186" class="h" text-anchor="middle">Ingest Lambda</text>
+  <text x="550" y="206" class="sub" text-anchor="middle">Function URL · stateless</text>
+  <text x="550" y="224" class="sub" text-anchor="middle">merges thread → per-thread doc</text>
+
+  <!-- ── Query Lambda (shifted +165) ───────────────────────────────── -->
+  <rect x="435" y="370" width="230" height="80" rx="12" style="fill:#ffffff" stroke="#FF9900" stroke-width="2.4"/>
+  <text x="550" y="396" class="h" text-anchor="middle">Query Lambda</text>
+  <text x="550" y="416" class="sub" text-anchor="middle">Function URL · stateless</text>
+  <text x="550" y="434" class="sub" text-anchor="middle">calls KB · posts in-thread</text>
+
+  <!-- ── Slack → API GW (ingest path) ──────────────────────────────── -->
+  <line x1="200" y1="200" x2="246" y2="277" class="ingest" stroke-width="2.2" marker-end="url(#arrIng)"/>
+  <rect class="edgeBg" x="188" y="220" width="52" height="14" rx="3"/>
+  <text x="214" y="231" class="edge" text-anchor="middle">message</text>
+
+  <!-- ── Slack → API GW (query path) ───────────────────────────────── -->
+  <line x1="200" y1="396" x2="246" y2="333" class="query" stroke-width="2.2" marker-end="url(#arrQry)"/>
+  <rect class="edgeBg" x="188" y="368" width="60" height="14" rx="3"/>
+  <text x="218" y="379" class="edge" text-anchor="middle">@mention</text>
+
+  <!-- ── API GW → Ingest Lambda (/events route) ────────────────────── -->
+  <line x1="382" y1="277" x2="433" y2="200" class="ingest" stroke-width="2.2" marker-end="url(#arrIng)"/>
+
+  <!-- ── API GW → Query Lambda (/query route) ──────────────────────── -->
+  <line x1="382" y1="333" x2="433" y2="410" class="query" stroke-width="2.2" marker-end="url(#arrQry)"/>
+
+  <!-- ── Query Lambda → Slack reply (bypasses API GW, below box) ────── -->
+  <line x1="435" y1="430" x2="200" y2="430" class="query" stroke-width="2.2" marker-end="url(#arrQry)"/>
+  <rect class="edgeBg" x="282" y="436" width="70" height="14" rx="3"/>
+  <text x="317" y="447" class="edge" text-anchor="middle">post reply</text>
+
+  <!-- ── S3 events bucket (shifted +165) ───────────────────────────── -->
+  <rect x="725" y="160" width="160" height="80" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="1.6"/>
+  <text x="805" y="186" class="lbl" text-anchor="middle">Amazon S3</text>
+  <text x="805" y="206" class="sub" text-anchor="middle">events bucket</text>
+  <text x="805" y="224" class="sub" text-anchor="middle">per-thread JSON</text>
+
+  <!-- Ingest Lambda → S3 -->
+  <line x1="665" y1="200" x2="721" y2="200" class="ingest" stroke-width="2.2" marker-end="url(#arrIng)"/>
+  <rect class="edgeBg" x="671" y="180" width="50" height="14" rx="3"/>
+  <text x="696" y="191" class="edge" text-anchor="middle">PutObject</text>
+
+  <!-- ── Bedrock KB hub (shifted +165) ─────────────────────────────── -->
+  <rect x="925" y="170" width="200" height="240" rx="14" style="fill:#ffffff" stroke="#047857" stroke-width="2.6"/>
+  <text x="1025" y="200" class="h" text-anchor="middle">Bedrock</text>
+  <text x="1025" y="220" class="h" text-anchor="middle">Knowledge Base</text>
+  <line x1="945" y1="234" x2="1105" y2="234" stroke="#a7f3d0"/>
+  <text x="1025" y="256" class="sub" text-anchor="middle">central RAG hub</text>
+  <text x="1025" y="276" class="sub" text-anchor="middle">retrieve_and_generate</text>
+  <text x="1025" y="296" class="sub" text-anchor="middle">top-5 cosine</text>
+  <text x="1025" y="328" class="sub" text-anchor="middle">shared by both</text>
+  <text x="1025" y="346" class="sub" text-anchor="middle">Lambdas</text>
+  <line x1="945" y1="364" x2="1105" y2="364" stroke="#a7f3d0"/>
+  <text x="1025" y="386" class="sub" text-anchor="middle">orchestrates</text>
+  <text x="1025" y="402" class="sub" text-anchor="middle">chunk · embed · prompt</text>
+
+  <!-- S3 → KB sync -->
+  <line x1="885" y1="200" x2="921" y2="200" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrInk)"/>
+  <rect class="edgeBg" x="889" y="180" width="30" height="14" rx="3"/>
+  <text x="904" y="191" class="edge" text-anchor="middle">sync</text>
+
+  <!-- Query Lambda → KB (curved) -->
+  <path d="M 665 396 C 765 396, 865 360, 925 340" fill="none" class="query" stroke-width="2.2" marker-end="url(#arrQry)"/>
+  <rect class="edgeBg" x="733" y="358" width="148" height="14" rx="3"/>
+  <text x="807" y="369" class="edge" text-anchor="middle">retrieve_and_generate</text>
+
+  <!-- KB → Query Lambda (return, dashed) -->
+  <path d="M 925 380 C 865 396, 765 432, 669 432" fill="none" class="query" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrQry)"/>
+  <rect class="edgeBg" x="733" y="406" width="142" height="14" rx="3"/>
+  <text x="804" y="417" class="edge" text-anchor="middle">grounded answer</text>
+
+  <!-- ── Titan V2 (shifted +165) ────────────────────────────────────── -->
+  <rect x="1165" y="170" width="160" height="70" rx="12" style="fill:#ffffff" stroke="#047857" stroke-width="1.6"/>
+  <text x="1245" y="196" class="lbl" text-anchor="middle">Titan V2</text>
+  <text x="1245" y="216" class="sub" text-anchor="middle">embed · 1024-dim</text>
+  <text x="1245" y="232" class="sub" text-anchor="middle">index time</text>
+
+  <!-- ── S3 Vectors (shifted +165) ─────────────────────────────────── -->
+  <rect x="1165" y="255" width="160" height="70" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="1.6"/>
+  <text x="1245" y="281" class="lbl" text-anchor="middle">S3 Vectors</text>
+  <text x="1245" y="301" class="sub" text-anchor="middle">vector index</text>
+  <text x="1245" y="317" class="sub" text-anchor="middle">cosine search</text>
+
+  <!-- ── Nova Lite (shifted +165) ───────────────────────────────────── -->
+  <rect x="1165" y="340" width="160" height="70" rx="12" style="fill:#ffffff" stroke="#047857" stroke-width="1.6"/>
+  <text x="1245" y="366" class="lbl" text-anchor="middle">Nova Lite</text>
+  <text x="1245" y="386" class="sub" text-anchor="middle">prompt · grounded</text>
+  <text x="1245" y="402" class="sub" text-anchor="middle">≤ 5 bullets</text>
+
+  <!-- KB → Titan -->
+  <line x1="1125" y1="205" x2="1161" y2="205" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrInk)"/>
+  <rect class="edgeBg" x="1131" y="186" width="32" height="14" rx="3"/>
+  <text x="1147" y="197" class="edge" text-anchor="middle">embed</text>
+
+  <!-- KB ↔ S3 Vectors -->
+  <line x1="1125" y1="290" x2="1161" y2="290" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrInk)"/>
+  <rect class="edgeBg" x="1127" y="271" width="42" height="14" rx="3"/>
+  <text x="1148" y="282" class="edge" text-anchor="middle">search</text>
+
+  <!-- KB → Nova Lite -->
+  <line x1="1125" y1="375" x2="1161" y2="375" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrInk)"/>
+  <rect class="edgeBg" x="1131" y="356" width="32" height="14" rx="3"/>
+  <text x="1147" y="367" class="edge" text-anchor="middle">prompt</text>
+
+  <!-- ── Legend ───────────────────────────────────────────────────── -->
+  <rect x="40" y="528" width="1295" height="36" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+  <line x1="60" y1="546" x2="100" y2="546" class="ingest" stroke-width="2.4"/>
+  <text x="110" y="550" class="sub">Ingest path</text>
+  <line x1="220" y1="546" x2="260" y2="546" class="query" stroke-width="2.4"/>
+  <text x="270" y="550" class="sub">Query path</text>
+  <line x1="380" y1="546" x2="420" y2="546" stroke="#0f172a" stroke-width="1.6"/>
+  <text x="430" y="550" class="sub">Internal AWS hop</text>
+  <text x="1320" y="550" class="sub" text-anchor="end">API GW · two Lambdas · one Bedrock KB · zero glue infra</text>
+</svg>

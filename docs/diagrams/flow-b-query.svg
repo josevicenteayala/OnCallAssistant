@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" role="img" aria-label="Flow B — Query: engineer @mention triggers Bedrock KB retrieve_and_generate over S3 Vectors with Nova Lite, reply posted in-thread.">
+  <defs>
+    <style><![CDATA[
+      .actor    { font: 700 13px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #ffffff; }
+      .lbl      { font: 600 13px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #0f172a; }
+      .msg      { font: 500 12.5px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #0f172a; }
+      .self     { font: 500 12.5px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #334155; }
+      .num      { font: 700 12px -apple-system, "Segoe UI", Inter, Roboto, sans-serif; fill: #047857; }
+      .lifeline { stroke: #cbd5e1; stroke-width: 1.2; stroke-dasharray: 4 4; }
+    ]]></style>
+    <marker id="arr"  viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0f172a"/></marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+  </defs>
+
+  <rect width="1200" height="520" fill="#ffffff"/>
+
+  <!-- Actor headers -->
+  <rect x="20"   y="30" width="180" height="44" rx="8" fill="#4A154B"/>
+  <text x="110"  y="58" class="actor" text-anchor="middle">Engineer (Slack)</text>
+  <line x1="110" y1="74" x2="110" y2="480" class="lifeline"/>
+
+  <rect x="240"  y="30" width="200" height="44" rx="8" fill="#FF9900"/>
+  <text x="340"  y="58" class="actor" text-anchor="middle">Lambda · Query</text>
+  <line x1="340" y1="74" x2="340" y2="480" class="lifeline"/>
+
+  <rect x="500"  y="30" width="180" height="44" rx="8" fill="#047857"/>
+  <text x="590"  y="58" class="actor" text-anchor="middle">Bedrock KB</text>
+  <line x1="590" y1="74" x2="590" y2="480" class="lifeline"/>
+
+  <rect x="740"  y="30" width="180" height="44" rx="8" fill="#6366f1"/>
+  <text x="830"  y="58" class="actor" text-anchor="middle">S3 Vectors</text>
+  <line x1="830" y1="74" x2="830" y2="480" class="lifeline"/>
+
+  <rect x="980"  y="30" width="200" height="44" rx="8" fill="#047857"/>
+  <text x="1080" y="58" class="actor" text-anchor="middle">Nova Lite</text>
+  <line x1="1080" y1="74" x2="1080" y2="480" class="lifeline"/>
+
+  <!-- 1. Engineer @mentions bot -->
+  <text x="40" y="116" class="num">①</text>
+  <line x1="110" y1="128" x2="336" y2="128" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="223" y="116" class="msg" text-anchor="middle">@oncall-assistant — free-form question</text>
+  <text x="223" y="142" class="self" text-anchor="middle">e.g. "what's happening with apt-service?"</text>
+
+  <!-- 2. Lambda → KB -->
+  <text x="270" y="190" class="num">②</text>
+  <line x1="340" y1="202" x2="586" y2="202" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="463" y="192" class="msg" text-anchor="middle">retrieve_and_generate (KB · top-5 · cosine)</text>
+
+  <!-- 3. KB → S3 Vectors search -->
+  <text x="540" y="240" class="num">③</text>
+  <line x1="590" y1="252" x2="826" y2="252" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="708" y="242" class="msg" text-anchor="middle">vector search</text>
+
+  <!-- 4. S3 Vectors → KB return -->
+  <text x="540" y="280" class="num">④</text>
+  <line x1="830" y1="292" x2="594" y2="292" stroke="#475569" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrR)"/>
+  <text x="712" y="282" class="msg" text-anchor="middle" fill="#475569">top-5 past incidents</text>
+
+  <!-- 5. KB → Nova Lite -->
+  <text x="780" y="332" class="num">⑤</text>
+  <line x1="590" y1="344" x2="1076" y2="344" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="833" y="334" class="msg" text-anchor="middle">prompt · retrieved-only · ≤ 5 bullets</text>
+
+  <!-- 6. Nova → Lambda -->
+  <text x="270" y="382" class="num">⑥</text>
+  <line x1="1080" y1="394" x2="344" y2="394" stroke="#475569" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#arrR)"/>
+  <text x="712" y="384" class="msg" text-anchor="middle" fill="#475569">grounded answer + citations</text>
+
+  <!-- 7. Lambda → Engineer in-thread -->
+  <text x="40" y="436" class="num">⑦</text>
+  <line x1="340" y1="448" x2="114" y2="448" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arr)"/>
+  <text x="227" y="438" class="msg" text-anchor="middle">chat.postMessage · in-thread</text>
+
+  <!-- caption -->
+  <text x="600" y="500" class="lbl" text-anchor="middle" fill="#475569">Stateless Lambda · question goes straight to KB · no thread lookup, no extra Slack calls</text>
+</svg>
