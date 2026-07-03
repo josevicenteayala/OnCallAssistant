@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>On-Call Assistant — Slack-native RAG on AWS</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --ink: #0f172a;
+    --muted: #475569;
+    --accent: #2563eb;
+    --accent-soft: #dbeafe;
+    --rule: #e2e8f0;
+    --good: #047857;
+    --orange: #FF9900;
+  }
+  @page { size: 1280px 720px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #f1f5f9;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .slide {
+    width: 1280px;
+    height: 720px;
+    background: var(--bg);
+    margin: 16px auto;
+    padding: 48px 64px 56px;
+    page-break-after: always;
+    break-after: page;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  .slide::before {
+    content: "";
+    position: absolute; top: 0; left: 0;
+    width: 6px; height: 100%;
+    background: var(--accent);
+  }
+  .eyebrow {
+    font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700;
+  }
+  h1 {
+    font-size: 56px; line-height: 1.05; margin: 8px 0 0;
+    letter-spacing: -0.02em; font-weight: 700;
+  }
+  h2 {
+    font-size: 30px; line-height: 1.15; margin: 4px 0 8px;
+    letter-spacing: -0.01em; font-weight: 700;
+  }
+  .sub {
+    font-size: 20px; color: var(--muted); margin-top: 14px; max-width: 1000px;
+    line-height: 1.45;
+  }
+  .footer {
+    position: absolute; left: 64px; right: 64px; bottom: 18px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--muted);
+    border-top: 1px solid var(--rule); padding-top: 8px;
+  }
+  .footer .pill {
+    display: inline-block; padding: 2px 10px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700;
+  }
+
+  /* Title slide */
+  .title-slide { justify-content: center; }
+  .title-slide h1 .accent { color: var(--accent); }
+  .title-slide .meta {
+    margin-top: 32px; display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .chip {
+    padding: 6px 14px; border: 1px solid var(--rule);
+    border-radius: 999px; font-size: 14px; color: var(--muted);
+    background: #f8fafc;
+  }
+  .chip.dark { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+  /* Slide 2 — How it works */
+  .how {
+    display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px;
+    margin-top: 14px; flex: 1; align-items: stretch;
+  }
+  .steps { display: flex; flex-direction: column; gap: 14px; }
+  .step {
+    display: grid; grid-template-columns: 56px 1fr; gap: 16px;
+    border: 1px solid var(--rule); border-radius: 14px;
+    padding: 18px 20px; background: #f8fafc;
+    align-items: start;
+  }
+  .step .num {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 18px;
+  }
+  .step h3 { margin: 4px 0 4px; font-size: 18px; }
+  .step p  { margin: 0; font-size: 15px; color: var(--muted); line-height: 1.45; }
+  .step code {
+    font: 600 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #0f172a; background: #eef2ff; padding: 1px 6px; border-radius: 4px;
+  }
+  .mockup-frame {
+    border: 1px solid var(--rule); border-radius: 14px;
+    background: #f8fafc; padding: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mockup-frame img { width: 100%; height: auto; max-height: 540px; display: block; }
+
+  /* Diagram slides */
+  .diagram-wrap {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    margin-top: 8px;
+  }
+  .diagram-wrap img { width: 100%; max-width: 1180px; height: auto; display: block; }
+  .caption {
+    text-align: center; color: var(--muted); font-size: 14px;
+    margin-top: 8px;
+  }
+
+  /* Slide 3 — Architecture + delta strip */
+  .arch-stack {
+    display: flex; flex-direction: column; gap: 14px;
+    margin-top: 10px; flex: 1; min-height: 0;
+  }
+  .arch-stack .diagram-wrap {
+    flex: 1; min-height: 0; margin-top: 0;
+  }
+  .arch-stack .diagram-wrap img {
+    max-width: 1180px; max-height: 100%; width: auto; height: auto;
+  }
+  .delta-strip {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+    flex: 0 0 auto;
+  }
+  .delta {
+    border: 1px solid var(--rule); border-radius: 12px;
+    padding: 12px 16px; background: #f8fafc;
+  }
+  .delta.ingest  { border-left: 4px solid var(--accent); }
+  .delta.query   { border-left: 4px solid var(--good); }
+  .delta.neutral { border-left: 4px solid #94a3b8; }
+  .delta ul { margin: 6px 0 0; padding-left: 18px; }
+  .delta li {
+    font-size: 13px; line-height: 1.55; color: var(--ink); margin-bottom: 3px;
+  }
+  .delta li .label { color: var(--muted); }
+  .delta-strip-3 {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px;
+  }
+  .delta-strip-3 .delta h4 { font-size: 12px; }
+  .delta-strip-3 .delta h3 {
+    margin: 2px 0 4px; font-size: 16px; letter-spacing: -0.01em;
+  }
+  .delta-strip-3 .delta .note {
+    margin: 8px 0 0; font-size: 12px; color: var(--muted); font-style: italic;
+    line-height: 1.5;
+  }
+
+  /* Slide — Problem cards (3-up using step styling) */
+  .pain-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px;
+    margin-top: 14px;
+  }
+  .pain-grid .step { background: #f8fafc; align-items: start; }
+  .pain-grid .step .icon {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .delta h4 {
+    margin: 0 0 6px; font-size: 12px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .delta p {
+    margin: 0; font-size: 13px; line-height: 1.5; color: var(--ink);
+  }
+  .delta code {
+    font: 600 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #0f172a; background: #eef2ff; padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* Closing slide */
+  .closing-single {
+    margin-top: 18px; flex: 1; display: flex; flex-direction: column;
+  }
+  .card {
+    border: 1px solid var(--rule); border-radius: 14px; padding: 26px 32px;
+    background: #f8fafc;
+  }
+  .card.now  { border-top: 4px solid var(--good); }
+  .card h3 {
+    margin: 0 0 12px; font-size: 16px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .card ul { margin: 0; padding-left: 22px; }
+  .card li { font-size: 18px; line-height: 1.55; margin-bottom: 8px; }
+  .card li code {
+    font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: #0f172a; background: #eef2ff; padding: 1px 6px; border-radius: 4px;
+  }
+  .footnote {
+    font-size: 12.5px; color: var(--muted); margin-top: 10px; font-style: italic;
+  }
+  .takeaway {
+    margin-top: 14px; padding: 14px 20px;
+    background: #0f172a; color: #fff;
+    border-radius: 12px; font-size: 17px; line-height: 1.45;
+  }
+  .takeaway strong { color: #93c5fd; }
+</style>
+</head>
+<body>
+
+<!-- ───────────────────────── Slide 1 — Title ───────────────────────── -->
+<section class="slide title-slide">
+  <div class="eyebrow">PoC walkthrough · Internal</div>
+  <h1>On-Call Assistant</h1>
+  <h1><span class="accent">Slack-native RAG on AWS.</span></h1>
+  <p class="sub">An in-thread bot that turns your Slack incident history into searchable knowledge —
+    cuts time-to-context for on-call engineers by surfacing <em>similar past incidents</em> on demand.
+    Two AWS Lambda Function URLs · one Bedrock Knowledge Base · zero glue infrastructure.</p>
+  <div class="meta">
+    <span class="chip dark">Lambda Function URLs</span>
+    <span class="chip">Amazon S3</span>
+    <span class="chip">Bedrock Knowledge Base</span>
+    <span class="chip">Titan Text Embeddings V2 · 1024-dim</span>
+    <span class="chip">Amazon S3 Vectors · cosine</span>
+    <span class="chip">Amazon Nova Lite</span>
+  </div>
+  <div class="footer">
+    <span>On-Call Assistant — PoC walkthrough</span>
+    <span><span class="pill">1 / 6</span></span>
+  </div>
+</section>
+
+<!-- ───────────────────── Slide 2 — The Problem / Why ───────────────────── -->
+<section class="slide">
+  <div class="eyebrow">The problem</div>
+  <h2>Tribal knowledge is trapped in Slack threads.</h2>
+  <div class="pain-grid">
+    <div class="step">
+      <div class="icon">🕒</div>
+      <div>
+        <h3>Slow time-to-context</h3>
+        <p>On-call engineers lose minutes scrolling threads mid-incident.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="icon">🧠</div>
+      <div>
+        <h3>Tribal knowledge is unsearchable</h3>
+        <p>Years of incident threads — none of it findable.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="icon">🔁</div>
+      <div>
+        <h3>Repeated investigations</h3>
+        <p>The same incident gets re-diagnosed from scratch.</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>Why this matters &middot; the on-call pain</span>
+    <span><span class="pill">2 / 6</span></span>
+  </div>
+</section>
+
+<!-- ───────────────────── Slide 3 — How it works ───────────────────── -->
+<section class="slide">
+  <div class="eyebrow">How it works</div>
+  <h2>Capture · Ask · Answer.</h2>
+  <div class="how">
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <div>
+          <h3>Capture — every thread becomes knowledge</h3>
+          <p>Slack <code>message.channels</code> events stream to the Ingest Lambda.
+             All replies on a thread are merged into one document keyed by
+             <code>thread_ts</code>, written to Amazon S3, and indexed by Bedrock KB.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div>
+          <h3>Ask — engineer @mentions the bot</h3>
+          <p>An engineer mentions <code>@oncall-assistant</code> with a free-form question
+             — e.g. <em>"what's happening with apt-service?"</em>. The Query Lambda sends it
+             straight to the Knowledge Base. No thread lookup, no extra Slack calls.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div>
+          <h3>Answer — top-5 past incidents, grounded</h3>
+          <p>Bedrock KB runs cosine search over Amazon S3 Vectors, passes the top-5
+             retrieved chunks to Amazon Nova Lite under a strict <em>retrieved-only ·
+             ≤ 5 bullets</em> prompt, and posts the reply back in the same thread.</p>
+        </div>
+      </div>
+    </div>
+    <div class="mockup-frame">
+      <img src="diagrams/slack-mockup.svg" alt="Slack thread mockup: PagerDuty alert, engineer @mention, bot reply with bullets." />
+    </div>
+  </div>
+  <div class="footer">
+    <span>Three steps · concrete UX</span>
+    <span><span class="pill">3 / 6</span></span>
+  </div>
+</section>
+
+<!-- ─────────────────── Slide 4 — Architecture & flows ─────────────────── -->
+<section class="slide">
+  <div class="eyebrow">Architecture &amp; flows</div>
+  <h2>API GW &rarr; Two Lambdas. One knowledge base.</h2>
+  <div class="arch-stack">
+    <div class="diagram-wrap">
+      <img src="diagrams/architecture.svg" alt="Architecture: Slack zone, API Gateway HTTP API with POST /events and POST /query routes, AWS compute zone with Ingest and Query Lambda Function URLs, AWS RAG core zone with S3, Bedrock KB, Titan V2, S3 Vectors and Nova Lite. Blue edges trace the ingest path; green edges trace the query path." />
+    </div>
+    <div class="delta-strip">
+      <div class="delta ingest">
+        <h4>Ingest path</h4>
+        <p><code>POST /events</code> route &middot; Idempotent on <code>thread_ts</code> &middot; <code>start_ingestion_job</code> triggers KB sync &middot; KB chunks then embeds via Titan V2 &middot; resolution replies re-ingest automatically.</p>
+      </div>
+      <div class="delta query">
+        <h4>Query path</h4>
+        <p><code>POST /query</code> route &middot; Stateless &middot; <code>retrieve_and_generate</code> runs KB retrieval + Nova Lite prompt in one call &middot; <code>chat.postMessage</code> posts in-thread &middot; &le; 5 grounded bullets.</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <span>End-to-end architecture &middot; both flows</span>
+    <span><span class="pill">4 / 6</span></span>
+  </div>
+</section>
+
+<!-- ─────────────────── Slide 5 — Metrics & cost ─────────────────── -->
+<section class="slide">
+  <div class="eyebrow">Metrics &amp; cost</div>
+  <h2>Low-cost by design — serverless, pay-per-use.</h2>
+  <div class="delta-strip-3" style="margin-top: 14px;">
+    <div class="delta ingest">
+      <h4>Vector store</h4>
+      <h3>Amazon S3 Vectors</h3>
+      <ul>
+        <li><span class="label">Storage</span> &middot; <code>$0.06 / GB-month</code></li>
+        <li><span class="label">Data upload</span> &middot; <code>$0.20 / GB</code> (PUT) <span style="font-size:11px;color:var(--muted)">· min 128 KB/PUT</span></li>
+        <li><span class="label">Query request</span> &middot; <code>$2.50 / million queries</code></li>
+        <li style="font-size:11px;line-height:1.55;"><span class="label">Query data processed</span> &middot;
+          <code style="font-size:10.5px;">$0.004/TB</code> <span style="color:var(--muted)">(≤100K vecs)</span> &middot;
+          <code style="font-size:10.5px;">$0.002/TB</code> <span style="color:var(--muted)">(100K–10M)</span> &middot;
+          <code style="font-size:10.5px;">$0.0004/TB</code> <span style="color:var(--muted)">(10M+)</span></li>
+        <li style="font-size:11px;line-height:1.55;"><span class="label">Query data returned</span> &middot; <code style="font-size:10.5px;">$0.01 / GB</code> <span style="color:var(--muted)">· first 512 KB/query free</span></li>
+      </ul>
+    </div>
+    <div class="delta query">
+      <h4>Compute &amp; storage</h4>
+      <h3>AWS Lambda &middot; Amazon S3</h3>
+      <ul>
+        <li><span class="label">Lambda req</span> &middot; <code>$0.20 / million</code> <span class="label">(1M/mo free)</span></li>
+        <li><span class="label">Lambda compute</span> &middot; <code>$0.0000166667 / GB-second</code> <span class="label">(400K GB-s/mo free)</span></li>
+        <li><span class="label">Lambda Function URLs</span> &middot; no additional charge</li>
+        <li><span class="label">Amazon S3 (standard)</span> &middot; <code>~$0.023 / GB-month</code></li>
+        <li style="font-size:11px;line-height:1.55;"><span class="label">Data transfer out</span> &middot; first 100 GB/mo free <span style="color:var(--muted);font-style:italic">(negligible at PoC)</span></li>
+      </ul>
+    </div>
+    <div class="delta neutral">
+      <h4>Foundation models</h4>
+      <h3>Bedrock — Amazon Nova Lite</h3>
+      <ul>
+        <li><span class="label">Input tokens</span> &middot; <code>$0.06 / M tokens</code></li>
+        <li><span class="label">Output tokens</span> &middot; <code>$0.24 / M tokens</code></li>
+        <li><span class="label">Titan V2 embeddings</span> &middot; <code>$0.00002 / 1K tokens</code></li>
+      </ul>
+      <p class="note">S3 Vectors chosen over OpenSearch Serverless to avoid always-on idle cost.</p>
+      <p class="note" style="margin-top:5px;">Model: Amazon Nova Lite (not Nova 2 Lite)</p>
+      <p class="note" style="margin-top:5px;">Knowledge Base &middot; no extra fee beyond embeddings, vector store &amp; model calls</p>
+    </div>
+  </div>
+  <p class="caption" style="margin-top: 10px; margin-bottom: 4px;">Official AWS pricing &middot; region: us-east-2 &middot; serverless &amp; pay-per-use &middot; no idle/always-on components</p>
+  <p style="text-align:center;font-size:11px;color:var(--muted);margin:0;line-height:1.6;">
+    <strong style="font-weight:600;">Sources:</strong>
+    <a href="https://aws.amazon.com/s3/pricing/" style="color:var(--accent);text-decoration:none;margin-left:4px;">Amazon S3 (Vectors &amp; Standard)</a> &middot;
+    <a href="https://aws.amazon.com/lambda/pricing/" style="color:var(--accent);text-decoration:none;">AWS Lambda</a> &middot;
+    <a href="https://aws.amazon.com/bedrock/pricing/" style="color:var(--accent);text-decoration:none;">Amazon Bedrock</a> &middot;
+    <a href="https://aws.amazon.com/nova/pricing/" style="color:var(--accent);text-decoration:none;">Amazon Nova</a>
+  </p>
+  <div class="footer">
+    <span>Engineering economics &middot; pay only on use</span>
+    <span><span class="pill">5 / 6</span></span>
+  </div>
+</section>
+
+<!-- ─────────────────── Slide 6 — Conclusion ─────────────────── -->
+<section class="slide">
+  <div class="eyebrow">Conclusion</div>
+  <h2>What the PoC proves.</h2>
+  <div class="closing-single">
+    <div class="card now">
+      <h3>What this proves</h3>
+      <ul>
+        <li>End-to-end loop works: Slack → index → @mention → grounded in-thread answer</li>
+        <li>Tribal Slack knowledge becomes <em>semantically searchable</em> with no manual curation</li>
+        <li>Continuous learning is free: resolution replies re-ingest automatically</li>
+        <li>Fully managed AWS stack — no servers, no vector DB to operate</li>
+        <li>Covers the real fault domains: Kubernetes, Kafka, IAM, TLS, business-logic incidents</li>
+      </ul>
+    </div>
+  </div>
+  <div class="takeaway">
+    <strong>Bottom line —</strong> a working, low-cost RAG agent that already shortens
+    time-to-context during incidents. Path to production is well-defined; the remaining work is
+    hardening, not invention.
+  </div>
+  <div class="footnote">PoC chose Amazon S3 Vectors over OpenSearch Serverless on cost; revisit at scale.</div>
+  <div class="footer">
+    <span>Conclusion &amp; recommendation</span>
+    <span><span class="pill">6 / 6</span></span>
+  </div>
+</section>
+</body>
+</html>
