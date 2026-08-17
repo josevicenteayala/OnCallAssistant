@@ -24,8 +24,10 @@ import boto3
 from botocore.exceptions import ClientError
 
 try:
+    from oncall.lambdas import live_extract
     from oncall.lambdas.slack_verify import response, verify_slack_signature
 except ImportError:  # flat Lambda zip layout (no package prefix)
+    import live_extract
     from slack_verify import response, verify_slack_signature
 
 # ---------------------------------------------------------------------------
@@ -38,8 +40,11 @@ logger = logging.getLogger(__name__)
 SLACK_SIGNING_SECRET    = os.environ.get("SLACK_SIGNING_SECRET", "")
 S3_BUCKET_NAME          = os.environ.get("S3_BUCKET_NAME", "")
 S3_PREFIX               = os.environ.get("S3_PREFIX", "events/")
+S3_CASES_PREFIX         = os.environ.get("S3_CASES_PREFIX", "cases/")
 BEDROCK_KB_ID           = os.environ.get("BEDROCK_KB_ID", "")
 BEDROCK_DATA_SOURCE_ID  = os.environ.get("BEDROCK_DATA_SOURCE_ID", "")
+# e.g. https://yourworkspace.slack.com — used to build case permalinks
+SLACK_WORKSPACE_URL     = os.environ.get("SLACK_WORKSPACE_URL", "")
 
 # boto3 clients are created lazily so the module imports cleanly (tests, tools)
 # without AWS credentials or a region configured.
@@ -157,6 +162,54 @@ def _get_existing_thread(s3_key: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# Live extraction — the quality gate between raw events and the Knowledge Base
+# ---------------------------------------------------------------------------
+
+def _permalink(channel_id: str, thread_ts: str) -> str:
+    """Best-effort Slack permalink for a thread (archive URL if the workspace
+    domain is configured, else an app-link placeholder)."""
+    if SLACK_WORKSPACE_URL:
+        return (
+            f"{SLACK_WORKSPACE_URL.rstrip('/')}/archives/{channel_id}"
+            f"/p{thread_ts.replace('.', '')}"
+        )
+    return f"slack://channel/{channel_id}/{thread_ts}"
+
+
+def _extract_and_index(channel_id: str, thread_ts: str, thread_doc: dict) -> None:
+    """Distill a resolved thread into a structured case and index it.
+
+    Runs the shared extraction prompt (redaction + confidence scoring), writes
+    the case to the cases/ prefix — the prefix the Knowledge Base data source
+    should point at — and triggers a KB sync. Best-effort: raw ingestion must
+    never fail because extraction did.
+    """
+    try:
+        case = live_extract.extract_case(thread_doc, _permalink(channel_id, thread_ts))
+        if case is None:
+            return
+        if not live_extract.should_index(case):
+            logger.info(
+                "Case gated out of the index — is_resolved=%s confidence=%s",
+                case.get("is_resolved"), case.get("confidence"),
+            )
+            return
+        case["thread_ts"] = thread_ts
+        case_key = f"{S3_CASES_PREFIX}{channel_id}/{thread_ts}.json"
+        _s3().put_object(
+            Bucket=S3_BUCKET_NAME,
+            Key=case_key,
+            Body=json.dumps(case, ensure_ascii=False),
+            ContentType="application/json",
+        )
+        logger.info("Structured case stored — key=%s confidence=%s",
+                    case_key, case.get("confidence"))
+        _trigger_bedrock_sync()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Live extraction failed (non-fatal): %s", exc)
+
+
+# ---------------------------------------------------------------------------
 # Bedrock sync
 # ---------------------------------------------------------------------------
 
@@ -206,6 +259,12 @@ def lambda_handler(event: dict, context) -> dict:
             return response(403, {"error": "Invalid Slack signature"})
 
         logger.info("Slack signature verified")
+
+        # Slack redelivers events not acked within ~3s; the timeline append
+        # below is not idempotent, so drop retry deliveries outright.
+        if "x-slack-retry-num" in headers:
+            logger.info("Ignoring Slack retry delivery #%s", headers["x-slack-retry-num"])
+            return response(200, {"message": "Retry ignored"})
 
         # ------------------------------------------------------------------
         # STEP 4 — Filter events (only plain user messages)
@@ -288,9 +347,12 @@ def lambda_handler(event: dict, context) -> dict:
                     s3_key, role, len(thread_doc["timeline"]))
 
         # ------------------------------------------------------------------
-        # STEP 9 — Trigger Bedrock Knowledge Base sync (best-effort)
+        # STEP 9 — On a resolution signal, extract a structured case
+        # (redacted, confidence-gated) and sync the Knowledge Base.
+        # Raw thread docs are audit-only; only cases/ should be indexed.
         # ------------------------------------------------------------------
-        _trigger_bedrock_sync()
+        if role == "resolution":
+            _extract_and_index(channel_id, thread_ts, thread_doc)
 
         # ------------------------------------------------------------------
         # STEP 10 — Return success
