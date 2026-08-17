@@ -38,24 +38,25 @@ timeline append is not idempotent.
 `questions.py`: `SLACK_SIGNING_SECRET`, `SLACK_BOT_TOKEN`, `BEDROCK_KB_ID`,
 `BEDROCK_MODEL_ARN`, `AWS_REGION_NAME`.
 
-## Deployment
+## Deployment (AWS Console friendly)
 
-Each handler deploys as its own Lambda. Entry points:
-`post_events.lambda_handler` and `questions.lambda_handler`.
-
-The handlers import their helpers with a flat-layout fallback, so zip the
-handler with its dependencies flat:
+Each handler deploys as its own Lambda. Run:
 
 ```bash
-cd src/oncall/lambdas && zip function.zip post_events.py live_extract.py slack_verify.py
-cd ../../..; zip -j src/oncall/lambdas/function.zip src/oncall/prompts.py src/oncall/extract/parsing.py
+make lambda_zips
 ```
 
-with the Lambda handler set to `post_events.lambda_handler`. The questions
-Lambda needs `questions.py`, `slack_verify.py`, and `prompts.py`. (The currently
-deployed function was created from a single `lambda_function.py` with handler
-`lambda_function.lambda_handler`; on the next deploy, update the handler
-setting to the new module name.)
+then in each Lambda's console page: **Code → Upload from → .zip file** and pick
+`dist/events-lambda.zip` (ingestion Lambda) or `dist/questions-lambda.zip`
+(bot Lambda), then Deploy. Inside each zip the entry file is named
+`lambda_function.py`, so the existing handler setting
+(`lambda_function.lambda_handler`) keeps working — no handler change needed.
+The handlers import their helper files with a flat-layout fallback, which is
+why the multi-file zip works without any package structure.
+
+The inline console editor still works for small tweaks afterwards — the zip
+just seeds it with all the files. Keep the repo as the source of truth and
+re-run `make lambda_zips` after edits rather than editing only in the console.
 
 ## Known gaps (tracked)
 
