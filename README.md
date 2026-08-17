@@ -13,14 +13,22 @@ confidence-gated suggestions into new issue threads.
 ```
 src/oncall/
   ingest/      slack_export.py, normalize.py     write path: steps 1–2
-  extract/     extract.py (Bedrock)              write path: step 3
-  eval/        validate.py (HTML report)         step 4 + later retrieval eval
-  retrieval/   answer prompt + CLI               next slice (read path)
-  bot/         Slack bot, classifier, gate       Phase 1
+  extract/     extract.py, parsing.py (Bedrock)  write path: step 3
+  eval/        validate.py, holdout.py           step 4 + §5 go/no-go eval
+  retrieval/   answer prompt + CLI               read path (local RAG — built)
+  lambdas/     deployed live track: Events-API ingestion + @-mention bot
+  bot/         trigger classifier, gate          Phase 1
   prompts.py   all LLM prompts, versioned in one place
-infra/terraform/  S3 + Bedrock KB on S3 Vectors + DynamoDB   next slice
+infra/terraform/  import flow for the live Lambda; KB/DynamoDB modules next
 tests/   pytest    docs/   design & prompt specs    data/   local artifacts (gitignored)
 ```
+
+The live track (`src/oncall/lambdas/`) is deployed behind Lambda Function
+URLs: message events accumulate thread docs in S3 (`events/`, audit-only), a
+resolution signal triggers the shared extraction prompt, and only redacted,
+confidence-gated cases land in `cases/` — the prefix the Bedrock Knowledge
+Base indexes. The @-mention bot answers from the KB with Slack permalink
+citations. Deployment and required env vars: `src/oncall/lambdas/README.md`.
 
 ## Quickstart
 
@@ -45,6 +53,8 @@ Once cases look good, try the read path locally (no Knowledge Base needed yet):
 ```bash
 make index                                   # embed cases -> data/index.json
 make ask Q="pods crashlooping after a deploy"
+make holdout                                 # §5 go/no-go: hit-rate on held-out incidents
+open data/holdout_report.html
 ```
 
 See [`docs/data-pipeline.md`](docs/data-pipeline.md) for what to look for in the
