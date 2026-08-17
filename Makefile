@@ -1,5 +1,5 @@
 .RECIPEPREFIX = >
-.PHONY: install lint format test export normalize extract validate index ask pipeline clean
+.PHONY: install lint format test export normalize extract validate index ask holdout pipeline clean
 
 install:
 > pip install -e ".[dev]"
@@ -32,6 +32,9 @@ index:
 
 ask:
 > python -m oncall.retrieval.answer --index ./data/index.json --question "$(Q)"
+
+holdout:
+> python -m oncall.eval.holdout --cases ./data/structured_cases.jsonl --index ./data/index.json --n $(or $(N),25) --out ./data/holdout_report.html
 
 clean:
 > rm -f data/*.jsonl data/*.json data/*.html

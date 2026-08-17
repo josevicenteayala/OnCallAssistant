@@ -78,6 +78,39 @@ RULES
 - Frame everything as leads to verify, not guarantees. The engineer decides."""
 
 
+# --- Held-out retrieval evaluation (design §5 go/no-go) ---------------------
+
+HOLDOUT_JUDGE_SYSTEM_PROMPT = """You are grading the retrieval quality of an on-call assistant. You are given one real incident's ACTUAL RESOLUTION (root cause and solution, hidden from the assistant) and the LEADS the assistant retrieved from other past incidents.
+
+Decide whether any lead would have pointed the engineer in the right direction: it names the same root cause, the same fix or workaround, or is clearly the same recurring issue. A lead that is merely about the same service but a different problem is NOT a hit.
+
+Respond with ONLY one JSON object, no markdown fences, no explanation outside it:
+{"hit": true, "reason": "one plain sentence saying which lead helped and why (or why none did)"}"""
+
+
+def build_judge_user_message(issue: str, root_cause: str | None,
+                             solution: str | None, leads: list[dict]) -> str:
+    """Format one held-out incident and its retrieved leads for the judge."""
+    lines = [
+        f"INCIDENT (as the engineer would report it):\n{issue}\n",
+        f"ACTUAL ROOT CAUSE (hidden from the assistant): {root_cause}",
+        f"ACTUAL SOLUTION (hidden from the assistant): {solution}\n",
+        "RETRIEVED LEADS:",
+    ]
+    for i, lead in enumerate(leads, 1):
+        lines.append(
+            f"[{i}] similarity={lead.get('similarity', 0):.2f} "
+            f"service={lead.get('affected_service')} issue: {lead.get('issue')}"
+        )
+        lines.append(f"    root_cause: {lead.get('root_cause')}")
+        lines.append(f"    solution: {lead.get('solution')}")
+    if not leads:
+        lines.append("(no leads retrieved)")
+    return "\n".join(lines)
+
+
+# --- On-demand bot (Bedrock KB retrieve_and_generate) ------------------------
+
 KB_ANSWER_PROMPT_TEMPLATE = """You are an on-call assistant for the Loyalty platform. An engineer is asking for help with a current production issue. You are given past incidents retrieved from the team's resolved-incident knowledge base; each includes a Slack permalink to the original thread.
 
 RULES
