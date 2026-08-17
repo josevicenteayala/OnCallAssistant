@@ -1,14 +1,32 @@
-import hashlib
-import hmac
+"""Live ingestion Lambda — Slack Events API → S3 thread docs → Bedrock KB sync.
+
+Deployed behind a Lambda Function URL. Each Slack message event is appended to
+its thread's JSON document in S3 (keyed on thread_ts so replies land in the
+parent's file) and a Bedrock Knowledge Base ingestion job is triggered
+best-effort.
+
+Handler: post_events.lambda_handler (see this package's README for packaging).
+
+Required environment variables:
+  SLACK_SIGNING_SECRET    – used to verify Slack HMAC signatures
+  S3_BUCKET_NAME          – bucket for thread documents
+  S3_PREFIX               – key prefix (default "events/")
+  BEDROCK_KB_ID           – Bedrock Knowledge Base ID
+  BEDROCK_DATA_SOURCE_ID  – KB data source to sync after each write
+"""
 import json
 import logging
 import os
 import re
-import time
 from datetime import datetime, timezone
 
 import boto3
 from botocore.exceptions import ClientError
+
+try:
+    from oncall.lambdas.slack_verify import response, verify_slack_signature
+except ImportError:  # flat Lambda zip layout (no package prefix)
+    from slack_verify import response, verify_slack_signature
 
 # ---------------------------------------------------------------------------
 # Module-level setup — executed once per warm container
@@ -23,8 +41,25 @@ S3_PREFIX               = os.environ.get("S3_PREFIX", "events/")
 BEDROCK_KB_ID           = os.environ.get("BEDROCK_KB_ID", "")
 BEDROCK_DATA_SOURCE_ID  = os.environ.get("BEDROCK_DATA_SOURCE_ID", "")
 
-s3_client      = boto3.client("s3")
-bedrock_client = boto3.client("bedrock-agent")
+# boto3 clients are created lazily so the module imports cleanly (tests, tools)
+# without AWS credentials or a region configured.
+_s3_client      = None
+_bedrock_client = None
+
+
+def _s3():
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = boto3.client("s3")
+    return _s3_client
+
+
+def _bedrock():
+    global _bedrock_client
+    if _bedrock_client is None:
+        _bedrock_client = boto3.client("bedrock-agent")
+    return _bedrock_client
+
 
 # ---------------------------------------------------------------------------
 # Slack thread format parser
@@ -112,9 +147,9 @@ def _build_document(incident: dict, timeline: list) -> str:
 def _get_existing_thread(s3_key: str) -> dict | None:
     """Return the existing thread document from S3, or None if absent."""
     try:
-        obj = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
+        obj = _s3().get_object(Bucket=S3_BUCKET_NAME, Key=s3_key)
         return json.loads(obj["Body"].read())
-    except s3_client.exceptions.NoSuchKey:
+    except _s3().exceptions.NoSuchKey:
         return None
     except ClientError as exc:
         logger.warning("Could not fetch existing thread from S3: %s", exc)
@@ -128,57 +163,14 @@ def _get_existing_thread(s3_key: str) -> dict | None:
 def _trigger_bedrock_sync() -> None:
     """Start a Bedrock Knowledge Base ingestion job; log but never raise."""
     try:
-        response = bedrock_client.start_ingestion_job(
+        resp = _bedrock().start_ingestion_job(
             knowledgeBaseId=BEDROCK_KB_ID,
             dataSourceId=BEDROCK_DATA_SOURCE_ID,
         )
-        job_id = response.get("ingestionJob", {}).get("ingestionJobId", "unknown")
+        job_id = resp.get("ingestionJob", {}).get("ingestionJobId", "unknown")
         logger.info("Bedrock sync started — ingestionJobId=%s", job_id)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Bedrock sync failed (non-fatal): %s", exc)
-
-
-# ---------------------------------------------------------------------------
-# Slack signature verification
-# ---------------------------------------------------------------------------
-
-def _verify_slack_signature(headers: dict, raw_body: str) -> bool:
-    timestamp       = headers.get("x-slack-request-timestamp", "")
-    slack_signature = headers.get("x-slack-signature", "")
-
-    if not timestamp or not slack_signature:
-        logger.warning("Missing Slack signature headers")
-        return False
-
-    # Reject requests older than 5 minutes to prevent replay attacks
-    if abs(time.time() - int(timestamp)) > 300:
-        logger.warning("Request timestamp too old — possible replay attack")
-        return False
-
-    base_string = f"v0:{timestamp}:{raw_body}"
-    computed    = hmac.new(
-        SLACK_SIGNING_SECRET.encode("utf-8"),
-        base_string.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    if not hmac.compare_digest(f"v0={computed}", slack_signature):
-        logger.warning("Slack signature mismatch")
-        return False
-
-    return True
-
-
-# ---------------------------------------------------------------------------
-# Response helper
-# ---------------------------------------------------------------------------
-
-def _response(status_code: int, body: dict) -> dict:
-    return {
-        "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -205,13 +197,13 @@ def lambda_handler(event: dict, context) -> dict:
         # ------------------------------------------------------------------
         if event_type == "url_verification":
             logger.info("Responding to Slack URL verification challenge")
-            return _response(200, {"challenge": body.get("challenge")})
+            return response(200, {"challenge": body.get("challenge")})
 
         # ------------------------------------------------------------------
         # STEP 3 — Verify Slack signature
         # ------------------------------------------------------------------
-        if not _verify_slack_signature(headers, raw_body):
-            return _response(403, {"error": "Invalid Slack signature"})
+        if not verify_slack_signature(headers, raw_body, SLACK_SIGNING_SECRET):
+            return response(403, {"error": "Invalid Slack signature"})
 
         logger.info("Slack signature verified")
 
@@ -225,7 +217,7 @@ def lambda_handler(event: dict, context) -> dict:
             or slack_event.get("subtype") is not None
         ):
             logger.info("Ignoring non-message or bot/edit event — skipping")
-            return _response(200, {"message": "Event ignored"})
+            return response(200, {"message": "Event ignored"})
 
         # ------------------------------------------------------------------
         # STEP 5 — Resolve thread identity
@@ -286,7 +278,7 @@ def lambda_handler(event: dict, context) -> dict:
         # ------------------------------------------------------------------
         # STEP 8 — Write back to S3 (same key → Bedrock KB deduplicates on sync)
         # ------------------------------------------------------------------
-        s3_client.put_object(
+        _s3().put_object(
             Bucket=S3_BUCKET_NAME,
             Key=s3_key,
             Body=json.dumps(thread_doc, indent=2),
@@ -303,14 +295,14 @@ def lambda_handler(event: dict, context) -> dict:
         # ------------------------------------------------------------------
         # STEP 10 — Return success
         # ------------------------------------------------------------------
-        return _response(200, {"message": "Event stored successfully"})
+        return response(200, {"message": "Event stored successfully"})
 
     except json.JSONDecodeError as exc:
         logger.error("Failed to parse request body: %s", exc)
-        return _response(400, {"error": "Invalid JSON body"})
+        return response(400, {"error": "Invalid JSON body"})
     except ClientError as exc:
         logger.error("AWS client error: %s", exc)
-        return _response(500, {"error": "Failed to store event"})
+        return response(500, {"error": "Failed to store event"})
     except Exception as exc:  # noqa: BLE001
         logger.error("Unexpected error: %s", exc)
-        return _response(500, {"error": "Internal server error"})
+        return response(500, {"error": "Internal server error"})

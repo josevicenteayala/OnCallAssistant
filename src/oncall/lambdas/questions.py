@@ -1,13 +1,13 @@
-"""
-bedrock_query_handler.py
+"""On-demand answer Lambda — @-mention → Bedrock KB retrieve_and_generate → reply.
 
-AWS Lambda handler for the on-call Slack bot.
 When a user mentions the bot in a Slack thread the handler:
   1. Verifies the request came from Slack
   2. Reads the parent thread message as incident context
   3. Enriches the question with that context
   4. Queries an Amazon Bedrock Knowledge Base
   5. Replies in the same Slack thread
+
+Handler: questions.lambda_handler (see this package's README for packaging).
 
 Required environment variables:
   SLACK_SIGNING_SECRET  – used to verify Slack HMAC signatures
@@ -16,19 +16,20 @@ Required environment variables:
   BEDROCK_MODEL_ARN     – Claude model ARN for retrieve_and_generate
   AWS_REGION_NAME       – AWS region (e.g. us-east-1)
 """
-
-import hashlib
-import hmac
 import json
 import logging
 import os
 import re
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
 import boto3
+
+try:
+    from oncall.lambdas.slack_verify import response, verify_slack_signature
+except ImportError:  # flat Lambda zip layout (no package prefix)
+    from slack_verify import response, verify_slack_signature
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -47,11 +48,17 @@ BEDROCK_KB_ID        = os.environ.get("BEDROCK_KB_ID", "")
 BEDROCK_MODEL_ARN    = os.environ.get("BEDROCK_MODEL_ARN", "")
 AWS_REGION_NAME      = os.environ.get("AWS_REGION_NAME", "us-east-2")
 
-# ---------------------------------------------------------------------------
-# AWS clients — initialised once per warm container
-# ---------------------------------------------------------------------------
+# boto3 client is created lazily so the module imports cleanly (tests, tools)
+# without AWS credentials configured.
+_bedrock_client = None
 
-bedrock_client = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION_NAME)
+
+def _bedrock():
+    global _bedrock_client
+    if _bedrock_client is None:
+        _bedrock_client = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION_NAME)
+    return _bedrock_client
+
 
 # ---------------------------------------------------------------------------
 # Bedrock prompt template
@@ -74,55 +81,6 @@ _BEDROCK_PROMPT = (
     "Retrieved past incidents:\n"
     "$search_results$"
 )
-
-# ---------------------------------------------------------------------------
-# Response helper
-# ---------------------------------------------------------------------------
-
-
-def _response(status_code: int, body: dict) -> dict:
-    return {
-        "statusCode": status_code,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(body),
-    }
-
-
-# ---------------------------------------------------------------------------
-# STEP 3 — Slack signature verification
-# ---------------------------------------------------------------------------
-
-
-def _verify_slack_signature(headers: dict, raw_body: str) -> bool:
-    timestamp       = headers.get("x-slack-request-timestamp", "")
-    slack_signature = headers.get("x-slack-signature", "")
-
-    if not timestamp or not slack_signature:
-        logger.warning("Missing Slack signature headers")
-        return False
-
-    # Reject requests older than 5 minutes (replay-attack prevention)
-    try:
-        if abs(time.time() - int(timestamp)) > 300:
-            logger.warning("Request timestamp too old — possible replay attack")
-            return False
-    except ValueError:
-        logger.warning("Invalid x-slack-request-timestamp value: %s", timestamp)
-        return False
-
-    base_string = f"v0:{timestamp}:{raw_body}"
-    computed    = hmac.new(
-        SLACK_SIGNING_SECRET.encode("utf-8"),
-        base_string.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    if not hmac.compare_digest(f"v0={computed}", slack_signature):
-        logger.warning("Slack signature mismatch")
-        return False
-
-    return True
-
 
 # ---------------------------------------------------------------------------
 # STEP 7 — Fetch parent thread message from Slack
@@ -170,7 +128,7 @@ def _query_bedrock(enriched_question: str) -> tuple[str, int]:
         enriched_question,
     )
 
-    response = bedrock_client.retrieve_and_generate(
+    resp = _bedrock().retrieve_and_generate(
         input={"text": enriched_question},
         retrieveAndGenerateConfiguration={
             "type": "KNOWLEDGE_BASE",
@@ -191,8 +149,8 @@ def _query_bedrock(enriched_question: str) -> tuple[str, int]:
         },
     )
 
-    answer    = response.get("output", {}).get("text", "No answer returned.")
-    citations = response.get("citations", [])
+    answer    = resp.get("output", {}).get("text", "No answer returned.")
+    citations = resp.get("citations", [])
 
     # Log each retrieved passage so you can verify what the KB returned
     for idx, citation in enumerate(citations, start=1):
@@ -281,32 +239,32 @@ def lambda_handler(event: dict, context) -> dict:
         body = json.loads(raw_body)
     except json.JSONDecodeError as exc:
         logger.error("Failed to parse request body: %s", exc)
-        return _response(400, {"error": "Invalid JSON body"})
+        return response(400, {"error": "Invalid JSON body"})
 
     # ------------------------------------------------------------------
     # STEP 2 — Handle URL verification challenge (no auth needed)
     # ------------------------------------------------------------------
     if body.get("type") == "url_verification":
         logger.info("Responding to Slack URL verification challenge")
-        return _response(200, {"challenge": body.get("challenge")})
+        return response(200, {"challenge": body.get("challenge")})
 
     # ------------------------------------------------------------------
     # STEP 3 — Verify Slack request signature
     # ------------------------------------------------------------------
-    if not _verify_slack_signature(headers, raw_body):
-        return _response(403, {"error": "Invalid Slack signature"})
+    if not verify_slack_signature(headers, raw_body, SLACK_SIGNING_SECRET):
+        return response(403, {"error": "Invalid Slack signature"})
 
     # ------------------------------------------------------------------
     # STEP 4 — Filter: only process app_mention event callbacks
     # ------------------------------------------------------------------
     if body.get("type") != "event_callback":
         logger.info("Ignoring non-event_callback type=%s", body.get("type"))
-        return _response(200, {"message": "Ignored"})
+        return response(200, {"message": "Ignored"})
 
     slack_event = body.get("event", {})
     if slack_event.get("type") != "app_mention":
         logger.info("Ignoring non-app_mention event type=%s", slack_event.get("type"))
-        return _response(200, {"message": "Ignored"})
+        return response(200, {"message": "Ignored"})
 
     # ------------------------------------------------------------------
     # STEP 5 — Extract event details
@@ -327,7 +285,7 @@ def lambda_handler(event: dict, context) -> dict:
     cleaned_question = re.sub(r"<@[A-Z0-9]+>", "", text).strip()
     if not cleaned_question:
         logger.info("Empty question after stripping mention — ignoring")
-        return _response(200, {"message": "Empty question"})
+        return response(200, {"message": "Empty question"})
 
     logger.info("Question extracted: %s", cleaned_question)
 
@@ -365,7 +323,7 @@ def lambda_handler(event: dict, context) -> dict:
             reply_ts,
             "Sorry, I couldn't query past incidents right now. Please try again in a moment.",
         )
-        return _response(200, {"message": "Bedrock error — fallback message sent"})
+        return response(200, {"message": "Bedrock error — fallback message sent"})
 
     # ------------------------------------------------------------------
     # STEP 9 — Format the Slack reply
@@ -380,5 +338,4 @@ def lambda_handler(event: dict, context) -> dict:
     # ------------------------------------------------------------------
     # STEP 11 — Always return 200 to prevent Slack retry loops
     # ------------------------------------------------------------------
-    return _response(200, {"message": "Bot response sent"})
- 
+    return response(200, {"message": "Bot response sent"})
