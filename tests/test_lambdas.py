@@ -61,6 +61,10 @@ class TestVerifySlackSignature:
         headers = _headers(body, timestamp="not-a-number")
         assert verify_slack_signature(headers, body, SECRET) is False
 
+    def test_refuses_when_signing_secret_unset(self):
+        body = "body"
+        assert verify_slack_signature(_headers(body), body, "") is False
+
 
 class TestResponse:
     def test_shapes_lambda_proxy_response(self):
