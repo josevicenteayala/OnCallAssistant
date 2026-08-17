@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Read path A - ask a question and get a grounded, cited answer.
 
 Embeds the question, retrieves the most similar past cases from the local index,

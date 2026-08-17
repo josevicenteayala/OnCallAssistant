@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Step 3 - Extract structured cases via Amazon Bedrock.
 
 Calls Bedrock (Converse API) once per normalized thread with the extraction
@@ -46,8 +45,7 @@ def strip_fences(s: str) -> str:
         s = s[3:]
         if s[:4].lower() == "json":
             s = s[4:]
-        if s.endswith("```"):
-            s = s[:-3]
+        s = s.removesuffix("```")
     return s.strip()
 
 

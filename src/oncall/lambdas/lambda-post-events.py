@@ -5,7 +5,7 @@ import logging
 import os
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import boto3
 from botocore.exceptions import ClientError
@@ -185,7 +185,7 @@ def _response(status_code: int, body: dict) -> dict:
 # Lambda handler
 # ---------------------------------------------------------------------------
 
-def lambda_handler(event: dict, context) -> dict:  # noqa: ANN001
+def lambda_handler(event: dict, context) -> dict:
     try:
         # ------------------------------------------------------------------
         # STEP 1 — Parse incoming request
@@ -259,7 +259,7 @@ def lambda_handler(event: dict, context) -> dict:  # noqa: ANN001
                     "event_id":   f"{channel_id}-{thread_ts}",
                     "channel_id": channel_id,
                     "thread_ts":  thread_ts,
-                    "ingested_at": datetime.utcnow().isoformat(),
+                    "ingested_at": datetime.now(timezone.utc).isoformat(),
                 },
                 "incident":  incident,
                 "timeline":  [],
@@ -280,7 +280,7 @@ def lambda_handler(event: dict, context) -> dict:  # noqa: ANN001
 
         # Regenerate document so the re-ingested embedding covers the full timeline
         thread_doc["document"]                  = _build_document(incident, thread_doc["timeline"])
-        thread_doc["_meta"]["last_updated"]     = datetime.utcnow().isoformat()
+        thread_doc["_meta"]["last_updated"]     = datetime.now(timezone.utc).isoformat()
         thread_doc["_meta"]["message_count"]    = len(thread_doc["timeline"])
 
         # ------------------------------------------------------------------

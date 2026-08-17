@@ -270,7 +270,7 @@ def _post_to_slack(channel: str, thread_ts: str, text: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def lambda_handler(event: dict, context) -> dict:  # noqa: ANN001
+def lambda_handler(event: dict, context) -> dict:
     # ------------------------------------------------------------------
     # STEP 1 — Parse Lambda Function URL event
     # ------------------------------------------------------------------
