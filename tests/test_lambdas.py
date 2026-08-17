@@ -135,3 +135,30 @@ class TestFormatSlackMessage:
         msg = _format_slack_message("Roll back the deploy.", 3)
         assert "Roll back the deploy." in msg
         assert "3 past incident(s) referenced" in msg
+
+    def test_is_labeled_ai_and_has_no_phantom_command(self):
+        msg = _format_slack_message("answer", 1)
+        assert "AI suggestion" in msg
+        assert "/kb-search" not in msg  # command doesn't exist
+
+
+class TestKbAnswerPromptTemplate:
+    def test_keeps_bedrock_placeholders(self):
+        from oncall.prompts import KB_ANSWER_PROMPT_TEMPLATE
+
+        # retrieve_and_generate substitutes these two markers verbatim.
+        assert "$query$" in KB_ANSWER_PROMPT_TEMPLATE
+        assert "$search_results$" in KB_ANSWER_PROMPT_TEMPLATE
+
+    def test_demands_grounding_and_permalink_citations(self):
+        from oncall.prompts import KB_ANSWER_PROMPT_TEMPLATE
+
+        assert "permalink" in KB_ANSWER_PROMPT_TEMPLATE
+        assert "Sources:" in KB_ANSWER_PROMPT_TEMPLATE
+        assert "ONLY" in KB_ANSWER_PROMPT_TEMPLATE
+
+    def test_questions_lambda_uses_the_shared_template(self):
+        from oncall import prompts
+        from oncall.lambdas import questions
+
+        assert questions.KB_ANSWER_PROMPT_TEMPLATE is prompts.KB_ANSWER_PROMPT_TEMPLATE

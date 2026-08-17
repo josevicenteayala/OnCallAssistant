@@ -28,7 +28,9 @@ import boto3
 
 try:
     from oncall.lambdas.slack_verify import response, verify_slack_signature
+    from oncall.prompts import KB_ANSWER_PROMPT_TEMPLATE
 except ImportError:  # flat Lambda zip layout (no package prefix)
+    from prompts import KB_ANSWER_PROMPT_TEMPLATE
     from slack_verify import response, verify_slack_signature
 
 # ---------------------------------------------------------------------------
@@ -59,28 +61,6 @@ def _bedrock():
         _bedrock_client = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION_NAME)
     return _bedrock_client
 
-
-# ---------------------------------------------------------------------------
-# Bedrock prompt template
-# ---------------------------------------------------------------------------
-
-_BEDROCK_PROMPT = (
-    "You are an expert on-call assistant for engineers resolving production incidents.\n\n"
-    "An engineer is asking for help with a current production issue. "
-    "Use ONLY the context from past Slack incidents retrieved below to help them.\n\n"
-    "If the incident context is provided, use it to make your response more specific "
-    "and relevant.\n\n"
-    "If no relevant past incidents are found say:\n"
-    '"I couldn\'t find similar past incidents in our history. '
-    "Please check the runbooks or escalate.\"\n\n"
-    "Keep your response concise, clear and actionable.\n"
-    "Use bullet points for resolution steps.\n"
-    "Maximum 5 bullet points.\n\n"
-    "Current incident and question:\n"
-    "$query$\n\n"
-    "Retrieved past incidents:\n"
-    "$search_results$"
-)
 
 # ---------------------------------------------------------------------------
 # STEP 7 — Fetch parent thread message from Slack
@@ -142,7 +122,7 @@ def _query_bedrock(enriched_question: str) -> tuple[str, int]:
                 },
                 "generationConfiguration": {
                     "promptTemplate": {
-                        "textPromptTemplate": _BEDROCK_PROMPT,
+                        "textPromptTemplate": KB_ANSWER_PROMPT_TEMPLATE,
                     }
                 },
             },
@@ -183,11 +163,10 @@ def _query_bedrock(enriched_question: str) -> tuple[str, int]:
 
 def _format_slack_message(answer: str, citation_count: int) -> str:
     return (
-        ":robot_face: *On-Call Assistant*\n\n"
+        ":robot_face: *On-Call Assistant* — AI suggestion, verify before applying\n\n"
         ":mag: *Based on past incidents:*\n\n"
         f"{answer}\n\n"
-        f":file_folder: *{citation_count} past incident(s) referenced*\n"
-        "_Use /kb-search for more details_"
+        f":file_folder: *{citation_count} past incident(s) referenced*"
     )
 
 
