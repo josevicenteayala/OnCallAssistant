@@ -24,16 +24,26 @@ def strip_fences(s: str) -> str:
 
 
 def parse_case(text: str):
-    """Best-effort parse of the model output into a dict, or None."""
+    """Best-effort parse of the model output into a dict, or None.
+
+    Only dicts are ever returned: valid JSON that isn't an object (a list,
+    string, number...) falls through to the brace-extraction attempt and then
+    to None, so callers can safely use dict operations on the result.
+    """
     candidate = strip_fences(text)
     try:
-        return json.loads(candidate)
+        parsed = json.loads(candidate)
+        if isinstance(parsed, dict):
+            return parsed
     except json.JSONDecodeError:
-        # Fall back to the outermost braces.
-        start, end = candidate.find("{"), candidate.rfind("}")
-        if start != -1 and end > start:
-            try:
-                return json.loads(candidate[start:end + 1])
-            except json.JSONDecodeError:
-                return None
+        pass
+    # Fall back to the outermost braces.
+    start, end = candidate.find("{"), candidate.rfind("}")
+    if start != -1 and end > start:
+        try:
+            parsed = json.loads(candidate[start:end + 1])
+            if isinstance(parsed, dict):
+                return parsed
+        except json.JSONDecodeError:
+            return None
     return None
