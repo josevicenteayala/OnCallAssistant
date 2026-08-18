@@ -146,6 +146,30 @@ class TestFormatSlackMessage:
         assert "/kb-search" not in msg  # command doesn't exist
 
 
+class TestQuestionsRetrySkip:
+    def test_slack_retry_delivery_is_dropped(self):
+        import json as _json
+        from unittest.mock import patch
+
+        from oncall.lambdas import questions
+
+        body = _json.dumps({"type": "event_callback", "event": {"type": "app_mention"}})
+        with patch.object(questions, "verify_slack_signature", return_value=True):
+            out = questions.lambda_handler(
+                {
+                    "headers": {
+                        "x-slack-retry-num": "1",
+                        "x-slack-request-timestamp": "1",
+                        "x-slack-signature": "v0=x",
+                    },
+                    "body": body,
+                },
+                None,
+            )
+        assert out["statusCode"] == 200
+        assert "Retry ignored" in out["body"]
+
+
 class TestKbAnswerPromptTemplate:
     def test_keeps_bedrock_placeholders(self):
         from oncall.prompts import KB_ANSWER_PROMPT_TEMPLATE

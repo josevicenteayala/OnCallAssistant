@@ -233,6 +233,13 @@ def lambda_handler(event: dict, context) -> dict:
     if not verify_slack_signature(headers, raw_body, SLACK_SIGNING_SECRET):
         return response(403, {"error": "Invalid Slack signature"})
 
+    # Slack redelivers events not acked within ~3s; the Bedrock call takes
+    # longer than that, so drop retry deliveries or every mention would be
+    # answered up to 4 times.
+    if "x-slack-retry-num" in headers:
+        logger.info("Ignoring Slack retry delivery #%s", headers["x-slack-retry-num"])
+        return response(200, {"message": "Retry ignored"})
+
     # ------------------------------------------------------------------
     # STEP 4 — Filter: only process app_mention event callbacks
     # ------------------------------------------------------------------
