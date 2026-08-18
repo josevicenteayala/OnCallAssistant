@@ -7,3 +7,5 @@ __pycache__/
 data/*
 !data/.gitkeep
 *.html
+dist/
+.DS_Store

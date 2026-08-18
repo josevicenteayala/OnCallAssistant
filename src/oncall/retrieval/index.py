@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Read path A - build a local vector index from the structured cases.
 
 Embeds each indexable case (resolved and confidence >= cutoff) with Titan and

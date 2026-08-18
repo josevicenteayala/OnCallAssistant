@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Step 3 - Extract structured cases via Amazon Bedrock.
 
 Calls Bedrock (Converse API) once per normalized thread with the extraction
@@ -30,41 +29,8 @@ try:
 except ImportError:
     sys.exit("Missing dependency. Run: pip install -r requirements.txt")
 
+from oncall.extract.parsing import REQUIRED_FIELDS, parse_case
 from oncall.prompts import EXTRACTION_SYSTEM_PROMPT, build_user_message
-
-REQUIRED_FIELDS = {
-    "is_resolved", "summary", "issue", "affected_service", "category", "tags",
-    "root_cause", "troubleshooting_steps", "solution", "solution_type",
-    "confidence", "permalink", "redaction_applied",
-}
-
-
-def strip_fences(s: str) -> str:
-    """Remove ```json ... ``` fences if the model added them."""
-    s = s.strip()
-    if s.startswith("```"):
-        s = s[3:]
-        if s[:4].lower() == "json":
-            s = s[4:]
-        if s.endswith("```"):
-            s = s[:-3]
-    return s.strip()
-
-
-def parse_case(text: str):
-    """Best-effort parse of the model output into a dict, or None."""
-    candidate = strip_fences(text)
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError:
-        # Fall back to the outermost braces.
-        start, end = candidate.find("{"), candidate.rfind("}")
-        if start != -1 and end > start:
-            try:
-                return json.loads(candidate[start:end + 1])
-            except json.JSONDecodeError:
-                return None
-    return None
 
 
 def converse(client, model_id, system, user_msg, max_retries=4):

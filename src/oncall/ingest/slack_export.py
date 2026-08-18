@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Step 1 - Export Slack channel history.
 
 Pulls every top-level message (and, for threaded ones, the full reply chain)
@@ -25,7 +24,7 @@ import json
 import os
 import sys
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 try:
     from slack_sdk import WebClient

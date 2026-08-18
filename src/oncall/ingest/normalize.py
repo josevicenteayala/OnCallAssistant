@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Step 2 - Normalize raw Slack threads.
 
 Turns the raw export into the clean shape the extraction prompt expects:

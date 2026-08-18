@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Step 4 - Validate extraction quality.
 
 Generates a self-contained HTML report putting each original thread next to its
