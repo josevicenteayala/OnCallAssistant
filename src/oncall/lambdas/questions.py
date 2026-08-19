@@ -153,7 +153,58 @@ def _query_bedrock(enriched_question: str) -> tuple[str, int]:
         len(answer),
         answer,
     )
-    return answer, len(citations)
+
+    # retrieve_and_generate hides retrieval when it produces no citations, so
+    # a zero-citation answer is undebuggable from its response alone. Run a
+    # raw retrieve and log the chunks + scores to tell "nothing was found"
+    # apart from "found but the model refused to use it".
+    if not citations:
+        _debug_retrieve(enriched_question)
+
+    return _normalize_answer(answer), len(citations)
+
+
+# Bedrock's canned response when retrieve_and_generate declines to answer
+# (e.g. no retrieval results). Replace it with our template's honest fallback
+# so engineers see actionable guidance instead of a generic apology.
+_CANNED_REFUSAL = "Sorry, I am unable to assist you with this request."
+_NO_MATCH_ANSWER = (
+    "I couldn't find similar past incidents in our history. "
+    "Please check the runbooks or escalate."
+)
+
+
+def _normalize_answer(answer: str) -> str:
+    if answer.strip() == _CANNED_REFUSAL:
+        return _NO_MATCH_ANSWER
+    return answer
+
+
+def _debug_retrieve(question: str) -> None:
+    """Log what raw KB retrieval returns for a question (best-effort)."""
+    try:
+        resp = _bedrock().retrieve(
+            knowledgeBaseId=BEDROCK_KB_ID,
+            retrievalQuery={"text": question},
+            retrievalConfiguration={"vectorSearchConfiguration": {"numberOfResults": 5}},
+        )
+        results = resp.get("retrievalResults", [])
+        if not results:
+            logger.warning("Debug retrieve: KB returned 0 chunks for this question")
+            return
+        logger.warning(
+            "Debug retrieve: KB returned %d chunk(s) but generation used none — "
+            "likely a prompt-template or model issue, not a retrieval one",
+            len(results),
+        )
+        for i, r in enumerate(results, 1):
+            logger.info(
+                "Debug retrieve [%d/%d] score=%s location=%s\n%s",
+                i, len(results), r.get("score"), r.get("location", {}),
+                r.get("content", {}).get("text", "")[:500],
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Debug retrieve failed (non-fatal): %s", exc)
 
 
 # ---------------------------------------------------------------------------

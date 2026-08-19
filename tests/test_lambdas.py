@@ -170,6 +170,19 @@ class TestQuestionsRetrySkip:
         assert "Retry ignored" in out["body"]
 
 
+class TestNormalizeAnswer:
+    def test_canned_refusal_becomes_actionable_fallback(self):
+        from oncall.lambdas import questions
+
+        out = questions._normalize_answer("Sorry, I am unable to assist you with this request.")
+        assert "runbooks or escalate" in out
+
+    def test_real_answer_passes_through(self):
+        from oncall.lambdas import questions
+
+        assert questions._normalize_answer("Roll back the deploy. [1]") == "Roll back the deploy. [1]"
+
+
 class TestKbAnswerPromptTemplate:
     def test_keeps_bedrock_placeholders(self):
         from oncall.prompts import KB_ANSWER_PROMPT_TEMPLATE
