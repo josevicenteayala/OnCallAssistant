@@ -167,6 +167,11 @@ def _query_bedrock(enriched_question: str) -> tuple[str, int]:
     answer = _normalize_answer(answer)
     if citations:
         answer = _rebuild_sources(answer, citations)
+        logger.info(
+            "Final answer after source rebuild (length=%d)\n--- FINAL ---\n%s\n-------------",
+            len(answer),
+            answer,
+        )
     return answer, len(citations)
 
 
@@ -202,17 +207,23 @@ def _collect_permalinks(citations: list) -> list[str]:
 
 
 def _rebuild_sources(answer: str, citations: list) -> str:
-    """Replace the model-written Sources section with one built from citations.
+    """Rebuild the Sources section deterministically.
 
     The model only sometimes transcribes real URLs — other times it leaks its
-    internal citation markers (e.g. %[2]%). The retrieved chunks carry the
-    actual permalinks, so build the section deterministically from them.
+    internal citation markers (e.g. %[2]%). And the citations' chunk text is
+    itself unreliable: some runs return citations with empty
+    retrievedReferences. So collect permalinks from BOTH the answer text and
+    the retrieved chunks (either can be empty on any given run), dedupe, and
+    rewrite the section from that union.
     """
+    links: list[str] = []
+    for link in _PERMALINK_RE.findall(answer) + _collect_permalinks(citations):
+        if link not in links:
+            links.append(link)
     idx = answer.rfind("Sources:")
     if idx != -1:
         answer = answer[:idx].rstrip()
     answer = _CITE_MARKER_RE.sub("", answer).rstrip()
-    links = _collect_permalinks(citations)
     if links:
         answer += "\n\nSources:\n" + "\n".join(f"- {link}" for link in links)
     return answer

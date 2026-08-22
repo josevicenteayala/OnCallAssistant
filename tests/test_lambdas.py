@@ -227,6 +227,31 @@ class TestRebuildSources:
         assert "%[" not in out
         assert out.strip() == "Answer."
 
+    def test_model_written_urls_survive_empty_citation_chunks(self):
+        # Production case: citations came back with empty retrievedReferences
+        # but the model transcribed real URLs itself — those must be kept.
+        from oncall.lambdas import questions
+
+        answer = (
+            "Do the thing.\n\nSources: \n"
+            "- https://personalvin.slack.com/archives/C09126VCR1P/p1787153577898639\n"
+            "- https://personalvin.slack.com/archives/C09126VCR1P/p1787358553480719"
+        )
+        out = questions._rebuild_sources(answer, [{"retrievedReferences": []}])
+        assert out.count("p1787153577898639") == 1
+        assert out.count("p1787358553480719") == 1
+        assert "Sources:" in out
+
+    def test_union_of_model_and_chunk_links_is_deduped(self):
+        from oncall.lambdas import questions
+
+        answer = (
+            "Do the thing.\n\nSources: \n"
+            "- https://personalvin.slack.com/archives/C09126VCR1P/p1787153577898639"
+        )
+        out = questions._rebuild_sources(answer, _citations())
+        assert out.count("p1787153577898639") == 1
+
 
 class TestKbAnswerPromptTemplate:
     def test_keeps_bedrock_placeholders(self):
