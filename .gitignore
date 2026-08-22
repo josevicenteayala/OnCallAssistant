@@ -9,3 +9,4 @@ data/*
 *.html
 dist/
 .DS_Store
+
