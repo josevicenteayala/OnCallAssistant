@@ -4,6 +4,13 @@ This is the prompt that turns one resolved Slack thread into one structured case
 
 Because the raw threads live in S3, this prompt is re-runnable — improve it and reprocess the whole corpus anytime.
 
+> **Implementation:** the live copy is `EXTRACTION_SYSTEM_PROMPT` in
+> [`../src/oncall/prompts.py`](../src/oncall/prompts.py) — the single source of
+> truth, used by **both** the batch pipeline (`oncall.extract.extract`) and the
+> live ingestion Lambda (`oncall.lambdas.live_extract`). This document is the
+> annotated spec with worked examples; if the two disagree, `prompts.py` wins
+> and this file needs updating.
+
 ---
 
 ## System prompt
@@ -160,9 +167,9 @@ Note how `category` reflects where the root cause sits (a bad ArgoCD-synced mani
 ## Wiring notes
 
 - **One thread per call, temperature 0.** Deterministic output and no cross-thread contamination. A modest `max_tokens` (e.g. ~1,500) is plenty for one record.
-- **Parse defensively.** Trim whitespace, strip stray code fences if the model adds them, then `JSON.parse`. On a parse failure, log the raw output and retry once; if it still fails, store the thread flagged `extraction_failed` for human review rather than dropping it silently.
-- **What to index vs. drop.** Only index records where `is_resolved` is `true` **and** `confidence >= 0.4` (tune this on real data). Lower-confidence and unresolved records still go to DynamoDB flagged for review — they may be worth a human pass, and they tell you where the channel's knowledge is thin.
-- **Redaction is layered.** This prompt is the first redaction pass at ingest; Bedrock Guardrails is the second pass at answer time. Don't rely on either alone.
+- **Parse defensively.** Trim whitespace, strip stray code fences if the model adds them, then parse. `oncall.extract.parsing.parse_case` does this and guarantees a **dict or None** — never another JSON type — so a model answering with a list or bare string degrades cleanly instead of raising. On a parse failure the batch runner writes the raw output to `structured_cases.jsonl.failures.jsonl` for human review rather than dropping it silently; the live Lambda logs it and skips indexing.
+- **What to index vs. drop.** Only index records where `is_resolved` is `true` **and** `confidence >= 0.4` (tune this on real data). That same gate lives in three places — `make index`, `make upload`, and the live Lambda's `CONFIDENCE_CUTOFF` — and they must agree. Dropped records are still preserved: the batch path keeps them in `structured_cases.jsonl` (the validation report shows them as DROP), and the live path keeps the full raw thread under `events/`. They're worth a human pass, and they show where the channel's knowledge is thin. *(The design's DynamoDB review store is not built — see `design-v2.md` "As-built status".)*
+- **Redaction is layered — but only one layer exists today.** This prompt is the first redaction pass at ingest. Bedrock Guardrails as the second, answer-time pass is **still outstanding**; until it ships, extraction quality is the only thing standing between a pasted credential and the index. Treat that as a known gap, not a solved problem.
 - **Re-runnable by design.** Keep every raw thread in S3. When you improve this prompt, reprocess the whole corpus — the structured store and vector index are derived artifacts, never the source of truth.
 - **Validate before trusting.** Run this over ~30 real threads first and eyeball the JSON. Tune the confidence rubric and the `category` definition to how your team actually talks before you back-fill all three years.
 

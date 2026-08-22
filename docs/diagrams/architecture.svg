@@ -58,16 +58,18 @@
   <text x="315" y="337" class="edge" text-anchor="middle" style="fill:#7c3aed; font-size:11px;">POST /query</text>
 
   <!-- ── Ingest Lambda (shifted +165 from original x=270) ────────── -->
-  <rect x="435" y="160" width="230" height="80" rx="12" style="fill:#ffffff" stroke="#FF9900" stroke-width="2.4"/>
-  <text x="550" y="186" class="h" text-anchor="middle">Ingest Lambda</text>
-  <text x="550" y="206" class="sub" text-anchor="middle">Function URL · stateless</text>
-  <text x="550" y="224" class="sub" text-anchor="middle">merges thread → per-thread doc</text>
+  <rect x="435" y="146" width="230" height="108" rx="12" style="fill:#ffffff" stroke="#FF9900" stroke-width="2.4"/>
+  <text x="550" y="170" class="h" text-anchor="middle">Ingest Lambda</text>
+  <text x="550" y="190" class="sub" text-anchor="middle">merges thread → per-thread doc</text>
+  <line x1="452" y1="200" x2="648" y2="200" stroke="#fde68a" stroke-width="1"/>
+  <text x="550" y="218" class="sub" text-anchor="middle" style="fill:#b45309">on resolution signal:</text>
+  <text x="550" y="236" class="sub" text-anchor="middle" style="fill:#b45309">extract · redact · confidence gate</text>
 
   <!-- ── Query Lambda (shifted +165) ───────────────────────────────── -->
   <rect x="435" y="370" width="230" height="80" rx="12" style="fill:#ffffff" stroke="#FF9900" stroke-width="2.4"/>
-  <text x="550" y="396" class="h" text-anchor="middle">Query Lambda</text>
-  <text x="550" y="416" class="sub" text-anchor="middle">Function URL · stateless</text>
-  <text x="550" y="434" class="sub" text-anchor="middle">calls KB · posts in-thread</text>
+  <text x="550" y="392" class="h" text-anchor="middle">Query Lambda</text>
+  <text x="550" y="412" class="sub" text-anchor="middle">calls KB · posts in-thread</text>
+  <text x="550" y="430" class="sub" text-anchor="middle">rebuilds citations from S3 keys</text>
 
   <!-- ── Slack → API GW (ingest path) ──────────────────────────────── -->
   <line x1="200" y1="200" x2="246" y2="277" class="ingest" stroke-width="2.2" marker-end="url(#arrIng)"/>
@@ -90,16 +92,27 @@
   <rect class="edgeBg" x="282" y="436" width="70" height="14" rx="3"/>
   <text x="317" y="447" class="edge" text-anchor="middle">post reply</text>
 
-  <!-- ── S3 events bucket (shifted +165) ───────────────────────────── -->
-  <rect x="725" y="160" width="160" height="80" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="1.6"/>
-  <text x="805" y="186" class="lbl" text-anchor="middle">Amazon S3</text>
-  <text x="805" y="206" class="sub" text-anchor="middle">events bucket</text>
-  <text x="805" y="224" class="sub" text-anchor="middle">per-thread JSON</text>
+  <!-- ── S3 bucket: two prefixes, only one is indexed ──────────────── -->
+  <rect x="725" y="132" width="160" height="136" rx="12" fill="#eef2ff" stroke="#6366f1" stroke-width="1.6"/>
+  <text x="805" y="154" class="lbl" text-anchor="middle">Amazon S3</text>
 
-  <!-- Ingest Lambda → S3 -->
-  <line x1="665" y1="200" x2="721" y2="200" class="ingest" stroke-width="2.2" marker-end="url(#arrIng)"/>
-  <rect class="edgeBg" x="671" y="180" width="50" height="14" rx="3"/>
-  <text x="696" y="191" class="edge" text-anchor="middle">PutObject</text>
+  <rect x="737" y="166" width="136" height="42" rx="6" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+  <text x="805" y="182" class="sub" text-anchor="middle" style="fill:#0f172a">events/</text>
+  <text x="805" y="198" class="sub" text-anchor="middle" style="font-size:11px">raw audit · NOT indexed</text>
+
+  <rect x="737" y="214" width="136" height="42" rx="6" fill="#ecfdf5" stroke="#047857" stroke-width="1.4"/>
+  <text x="805" y="230" class="sub" text-anchor="middle" style="fill:#0f172a">cases/</text>
+  <text x="805" y="246" class="sub" text-anchor="middle" style="font-size:11px">redacted · gated · indexed</text>
+
+  <!-- Ingest Lambda → S3 events/ -->
+  <line x1="665" y1="187" x2="721" y2="187" class="ingest" stroke-width="2.2" marker-end="url(#arrIng)"/>
+  <rect class="edgeBg" x="671" y="167" width="50" height="14" rx="3"/>
+  <text x="696" y="178" class="edge" text-anchor="middle">PutObject</text>
+
+  <!-- Ingest Lambda → S3 cases/ -->
+  <line x1="665" y1="235" x2="721" y2="235" class="ingest" stroke-width="2.2" stroke-dasharray="5 3" marker-end="url(#arrIng)"/>
+  <rect class="edgeBg" x="669" y="215" width="54" height="14" rx="3"/>
+  <text x="696" y="226" class="edge" text-anchor="middle">if gated in</text>
 
   <!-- ── Bedrock KB hub (shifted +165) ─────────────────────────────── -->
   <rect x="925" y="170" width="200" height="240" rx="14" style="fill:#ffffff" stroke="#047857" stroke-width="2.6"/>
@@ -115,10 +128,10 @@
   <text x="1025" y="386" class="sub" text-anchor="middle">orchestrates</text>
   <text x="1025" y="402" class="sub" text-anchor="middle">chunk · embed · prompt</text>
 
-  <!-- S3 → KB sync -->
-  <line x1="885" y1="200" x2="921" y2="200" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrInk)"/>
-  <rect class="edgeBg" x="889" y="180" width="30" height="14" rx="3"/>
-  <text x="904" y="191" class="edge" text-anchor="middle">sync</text>
+  <!-- S3 cases/ → KB sync (only the cases prefix is a data source) -->
+  <line x1="885" y1="235" x2="921" y2="235" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrInk)"/>
+  <rect class="edgeBg" x="889" y="215" width="30" height="14" rx="3"/>
+  <text x="904" y="226" class="edge" text-anchor="middle">sync</text>
 
   <!-- Query Lambda → KB (curved) -->
   <path d="M 665 396 C 765 396, 865 360, 925 340" fill="none" class="query" stroke-width="2.2" marker-end="url(#arrQry)"/>
@@ -144,9 +157,9 @@
 
   <!-- ── Nova Lite (shifted +165) ───────────────────────────────────── -->
   <rect x="1165" y="340" width="160" height="70" rx="12" style="fill:#ffffff" stroke="#047857" stroke-width="1.6"/>
-  <text x="1245" y="366" class="lbl" text-anchor="middle">Nova Lite</text>
-  <text x="1245" y="386" class="sub" text-anchor="middle">prompt · grounded</text>
-  <text x="1245" y="402" class="sub" text-anchor="middle">≤ 5 bullets</text>
+  <text x="1245" y="362" class="lbl" text-anchor="middle">Nova Lite</text>
+  <text x="1245" y="381" class="sub" text-anchor="middle">answers · grounded only</text>
+  <text x="1245" y="397" class="sub" text-anchor="middle">also runs extraction</text>
 
   <!-- KB → Titan -->
   <line x1="1125" y1="205" x2="1161" y2="205" stroke="#0f172a" stroke-width="1.6" marker-end="url(#arrInk)"/>

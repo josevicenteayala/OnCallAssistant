@@ -1,65 +1,82 @@
-# On-Call Assistant — Data Pipeline (PoC steps 1–4)
+# On-Call Assistant — Data Pipeline (backfill)
 
-This is the first slice of the PoC: turn three years of one Slack channel into a
-set of structured, quality-checked incident cases. Once this produces good
-output, the next slice indexes those cases and answers questions over them.
+This is the **batch** path: turn a Slack channel's history into structured,
+quality-checked incident cases, publish them to the Knowledge Base, and measure
+whether retrieval is actually useful.
+
+The **live** path (deployed Lambdas) does the same work per-thread as incidents
+resolve — see [`../src/oncall/lambdas/README.md`](../src/oncall/lambdas/README.md).
+Both paths share one extraction prompt and one confidence gate, and write the
+same S3 key layout, so backfilled and live cases are indistinguishable to the
+Knowledge Base.
 
 ```
-slack_export.py  →  normalize.py  →  extract.py  →  validate.py
-   (Slack API)       (local)          (Bedrock)      (HTML report)
+export  →  normalize  →  extract  →  validate  →  upload  →  index + holdout
+(Slack)    (local)      (Bedrock)   (HTML report) (S3 + KB)  (go/no-go number)
 ```
 
 ## What you do vs. what's automated
 
 **You (one-time setup, credentials):**
-- Create a Slack app and install it to the workspace; grant the bot scopes
+- Create a Slack app, install it to the workspace, grant the bot scopes
   `channels:history`, `channels:read`, `users:read` (add `groups:*` for a
-  private channel). Get the channel ID (in Slack: channel → View details).
-- Enable **Amazon Bedrock model access** for the model you'll use plus Titan
-  embeddings, and have AWS credentials available locally (env vars or a profile).
-- Keep tokens in your environment / a secret manager — never in these files.
+  private channel). Get the channel ID (Slack: channel → View details).
+- Enable **Amazon Bedrock model access** for a Converse-capable generation
+  model plus Titan embeddings, and have AWS credentials available locally.
+- Keep tokens in `.env` (gitignored) or a secret manager — never in the repo.
 
-**Automated (these scripts):** export, clean, extract, and report.
+**Automated (these commands):** export, clean, extract, report, publish, evaluate.
 
 ## Setup
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-export SLACK_BOT_TOKEN=xoxb-...            # your Slack bot token
-export AWS_REGION=us-east-1                # your Bedrock region
-export BEDROCK_MODEL_ID=...                # the model id you enabled in Bedrock
+make install
+cp .env.example .env      # then fill it in
+set -a && . ./.env && set +a
 ```
+
+`.env` keys: `SLACK_BOT_TOKEN`, `AWS_REGION`, `BEDROCK_MODEL_ID`,
+`EMBED_MODEL_ID`, and for the upload step `S3_BUCKET_NAME`, `BEDROCK_KB_ID`,
+`BEDROCK_DATA_SOURCE_ID`.
 
 > `BEDROCK_MODEL_ID` is intentionally not hardcoded: the right value depends on
 > the model and region you enable, and Bedrock often expects a region-specific
-> inference-profile id. Use whatever appears in the Bedrock console for the model
-> you turned on.
+> inference-profile id. Use whatever appears in the Bedrock console for the
+> model you turned on — a **generation** model (e.g. a Claude or Nova id), never
+> an embeddings model.
 
 ## Run order
 
 ```bash
-# 1. Export (reads Slack only)
-python slack_export.py --channel C0XXXXXXX --years 3 --outdir ./data
+# 1. Export (reads Slack only, with rate-limit backoff)
+make export CHANNEL=C0XXXXXXX
 
-# 2. Normalize (local transform)
-python normalize.py --indir ./data --outfile ./data/normalized_threads.jsonl
-
-# 3. Extract — START SMALL: ~30 threads first to check quality and cost
-python extract.py --infile ./data/normalized_threads.jsonl \
-                  --out ./data/structured_cases.jsonl --limit 30
-
-# 4. Validate — open the HTML and eyeball it
-python validate.py --threads ./data/normalized_threads.jsonl \
-                   --cases ./data/structured_cases.jsonl \
-                   --out ./data/validation_report.html
+# 2-4. Normalize -> extract a 30-thread SAMPLE -> validation report
+make pipeline
+open data/validation_report.html
 ```
 
-When the 30-thread sample looks right, re-run step 3 with `--limit 0` to process
-the whole corpus, then re-run step 4.
+**Stop here and read the report** before spending on the full corpus. When the
+sample looks right:
 
-## What to look for in the report
+```bash
+# 3b. Full extraction (one Bedrock call per thread)
+make extract LIMIT=0 && make validate
+
+# 5. Publish indexable cases to the KB prefix and start a sync
+python -m oncall.publish.upload_cases --cases ./data/structured_cases.jsonl \
+    --bucket $S3_BUCKET_NAME --dry-run      # preview first
+make upload BUCKET=$S3_BUCKET_NAME
+
+# 6. Local retrieval + the go/no-go number
+make index
+make ask Q="pods crashlooping after a deploy"
+make holdout
+open data/holdout_report.html
+```
+
+## What to look for in the validation report
 
 The report sorts cases by confidence and flags each **OK** (would be indexed:
 resolved and confidence ≥ 0.4) or **DROP** (held for review). Check:
@@ -68,14 +85,27 @@ resolved and confidence ≥ 0.4) or **DROP** (held for review). Check:
   `solution`, the prompt needs tightening (in `prompts.py`) — re-run, don't patch
   data by hand.
 - **Are good DROP rows being lost?** If useful resolutions sit just under 0.4, the
-  cutoff (used in `extract.py`/the index step and shown in `validate.py`) is too
-  high. This is how you pick the real threshold.
+  cutoff is too high. This is how you pick the real threshold; it is a flag on
+  `make index`, `make upload`, and the `CONFIDENCE_CUTOFF` env var on the live
+  Lambda — **keep all three in agreement.**
 - **Do categories match how your team talks?** Adjust the controlled vocabulary
   and the category definition in the prompt if the mapping feels off.
 - **Did redaction fire where it should?** Spot-check any row with `redaction_applied`
   true, and scan a few false ones for missed secrets.
 - **Coverage:** what fraction of threads end up indexable? That number is an early
   read on whether the channel is rich enough to be worth the full build.
+
+## What to look for in the holdout report
+
+`make holdout` hides the N most recent indexable cases, asks the retriever about
+each one's *symptom text only*, and has an LLM judge decide whether any retrieved
+lead points at the actual resolution. It prints a hit-rate against the **60%
+exit bar** from `design-v2.md` §8.
+
+The judge is a first pass, not an oracle: **scan the MISS rows and a few HITs
+yourself.** A low hit-rate has three very different causes worth separating —
+too few cases indexed (coverage), extraction losing the useful detail (prompt),
+or retrieval ranking badly (embedding/chunking).
 
 ## Notes
 
@@ -84,3 +114,8 @@ resolved and confidence ≥ 0.4) or **DROP** (held for review). Check:
 - Extraction runs one thread per call at temperature 0 for deterministic output.
 - Failures (unparseable model output) go to `structured_cases.jsonl.failures.jsonl`
   rather than being dropped silently — inspect them before a full back-fill.
+- `upload_cases` writes `cases/{channel_id}/{thread_ts}.json`, the same key the
+  live Lambda uses, so re-resolving a backfilled thread in Slack later updates
+  that case instead of creating a duplicate.
+- Before backfilling, clear any test/experiment cases out of the `cases/` prefix
+  and re-sync, so they don't pollute retrieval.

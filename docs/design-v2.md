@@ -4,6 +4,53 @@
 
 ---
 
+## As-built status (2026-08-21)
+
+> This document is the **design intent**. The list below is what is actually
+> deployed, so the two don't quietly drift apart. Sections 2–8 are unchanged
+> from the original design; read them as the target, not the current state.
+
+**Live and verified end-to-end** — incident thread → extraction → Knowledge
+Base → cited answer in Slack:
+
+| Design element | As built |
+|---|---|
+| Live ingestion (Events API) | ✅ API Gateway → ingestion Lambda; thread docs in S3 `events/` |
+| Extraction + redaction + confidence | ✅ Same prompt as the batch path, run in-Lambda on a resolution signal |
+| Knowledge Base on S3 Vectors | ✅ Indexes **only** the `cases/` prefix; `events/` is audit-only |
+| On-demand @-mention bot | ✅ `retrieve_and_generate`, grounded, threaded reply |
+| Grounded answers with permalinks | ✅ Citations rebuilt deterministically in code (see lambdas README) |
+| Backfill pipeline | ✅ Built (`make export`→`pipeline`→`upload`); **not yet run on real history** |
+| Retrieval evaluation | ✅ Built (`make holdout`); **no hit-rate measured yet** |
+
+**Designed but not built yet** — deliberate deferrals, not oversights:
+
+- **DynamoDB structured store** (§2, §4). Cases live in S3 only. At this corpus
+  size the KB covers retrieval and S3 covers durability; DynamoDB earns its
+  place when filtered lookups, verification flags, and the kill switch arrive.
+- **Bedrock Guardrails** (§4, §7). Redaction today is the extraction prompt's
+  first pass only. The second, answer-time pass is still outstanding — the
+  layered-defence argument in §7 is not yet satisfied.
+- **Bedrock Agents** (§3). The bot calls `retrieve_and_generate` directly;
+  no agent orchestration layer was needed for a single-tool workflow.
+- **Trigger classifier + proactive auto-post + shadow mode** (§2, §6). The whole
+  proactive branch is unbuilt; the assistant is on-demand only today.
+- **👍/👎 capture and kill switch** (§6).
+- **Terraform for the full stack** (§3). Only an import flow for the existing
+  Lambda exists; S3/KB/DynamoDB modules are still to write.
+
+**Model choices in production:** Amazon Nova 2 Lite (global inference profile)
+for both extraction and answer generation; Titan Text Embeddings V2 for the
+index — matching §3's recommendation to keep everything inside Bedrock.
+
+**Operational lessons worth carrying into Phase 2** (details in the lambdas
+README): Lambda timeouts must be ≥60s or Bedrock calls die silently; Slack
+redelivers unacked events, so both handlers drop retries; global inference
+profiles need IAM on both the profile ARN and the foundation-model ARN; and
+model-written citations are unreliable, so links are reconstructed in code.
+
+---
+
 ## Confirmed parameters
 
 | Parameter | Value | Design consequence |

@@ -286,10 +286,13 @@
       <div class="step">
         <div class="num">1</div>
         <div>
-          <h3>Capture — every thread becomes knowledge</h3>
+          <h3>Capture — every resolved thread becomes knowledge</h3>
           <p>Slack <code>message.channels</code> events stream to the Ingest Lambda.
              All replies on a thread are merged into one document keyed by
-             <code>thread_ts</code>, written to Amazon S3, and indexed by Bedrock KB.</p>
+             <code>thread_ts</code> in the <code>events/</code> audit prefix. When a reply
+             signals a resolution, the thread is distilled into a structured case —
+             secrets redacted, confidence scored — and only cases clearing the bar
+             land in <code>cases/</code>, the one prefix the Knowledge Base indexes.</p>
         </div>
       </div>
       <div class="step">
@@ -297,8 +300,9 @@
         <div>
           <h3>Ask — engineer @mentions the bot</h3>
           <p>An engineer mentions <code>@oncall-assistant</code> with a free-form question
-             — e.g. <em>"what's happening with apt-service?"</em>. The Query Lambda sends it
-             straight to the Knowledge Base. No thread lookup, no extra Slack calls.</p>
+             — e.g. <em>"what's happening with apt-service?"</em>. Asked inside a thread,
+             the Query Lambda first pulls the parent alert as incident context, then
+             sends the enriched question to the Knowledge Base.</p>
         </div>
       </div>
       <div class="step">
@@ -332,11 +336,11 @@
     <div class="delta-strip">
       <div class="delta ingest">
         <h4>Ingest path</h4>
-        <p><code>POST /events</code> route &middot; Idempotent on <code>thread_ts</code> &middot; <code>start_ingestion_job</code> triggers KB sync &middot; KB chunks then embeds via Titan V2 &middot; resolution replies re-ingest automatically.</p>
+        <p><code>POST /events</code> route &middot; Idempotent on <code>thread_ts</code> &middot; raw thread &rarr; <code>events/</code> (audit) &middot; on a resolution signal: extract &middot; redact &middot; confidence gate &rarr; <code>cases/</code> &middot; <code>start_ingestion_job</code> syncs only then &middot; KB chunks then embeds via Titan V2.</p>
       </div>
       <div class="delta query">
         <h4>Query path</h4>
-        <p><code>POST /query</code> route &middot; Stateless &middot; <code>retrieve_and_generate</code> runs KB retrieval + Nova Lite prompt in one call &middot; <code>chat.postMessage</code> posts in-thread &middot; &le; 5 grounded bullets.</p>
+        <p><code>POST /query</code> route &middot; Stateless &middot; optional thread-context fetch &middot; <code>retrieve_and_generate</code> runs KB retrieval + Nova Lite prompt in one call &middot; citations rebuilt from each case's S3 key &middot; <code>chat.postMessage</code> posts in-thread &middot; &le; 5 grounded bullets.</p>
       </div>
     </div>
   </div>
@@ -411,20 +415,21 @@
     <div class="card now">
       <h3>What this proves</h3>
       <ul>
-        <li>End-to-end loop works: Slack → index → @mention → grounded in-thread answer</li>
+        <li>End-to-end loop works: Slack → extract → index → @mention → grounded in-thread answer with clickable sources</li>
         <li>Tribal Slack knowledge becomes <em>semantically searchable</em> with no manual curation</li>
-        <li>Continuous learning is free: resolution replies re-ingest automatically</li>
+        <li>Continuous learning is free: resolving a thread in Slack updates the knowledge base</li>
+        <li>Quality is gated, not assumed: only resolved, confident, redacted cases get indexed</li>
         <li>Fully managed AWS stack — no servers, no vector DB to operate</li>
-        <li>Covers the real fault domains: Kubernetes, Kafka, IAM, TLS, business-logic incidents</li>
       </ul>
     </div>
   </div>
   <div class="takeaway">
-    <strong>Bottom line —</strong> a working, low-cost RAG agent that already shortens
-    time-to-context during incidents. Path to production is well-defined; the remaining work is
-    hardening, not invention.
+    <strong>Bottom line —</strong> a working, low-cost RAG agent, live and answering with
+    citations. The mechanism is proven; the <em>value</em> claim is next — back-fill the
+    channel's history and measure hit-rate on held-out incidents against the agreed 60% bar
+    before rolling out to the on-call team.
   </div>
-  <div class="footnote">PoC chose Amazon S3 Vectors over OpenSearch Serverless on cost; revisit at scale.</div>
+  <div class="footnote">PoC chose Amazon S3 Vectors over OpenSearch Serverless on cost; revisit at scale. &middot; Answer-time Guardrails and the proactive auto-post branch are designed but not yet built.</div>
   <div class="footer">
     <span>Conclusion &amp; recommendation</span>
     <span><span class="pill">6 / 6</span></span>
