@@ -1,4 +1,4 @@
-.PHONY: install lint format test export normalize extract validate index ask holdout pipeline lambda_zips clean
+.PHONY: install lint format test export normalize extract validate index ask holdout upload pipeline lambda_zips clean
 
 install:
 	pip install -e ".[dev]"
@@ -34,6 +34,11 @@ ask:
 
 holdout:
 	python -m oncall.eval.holdout --cases ./data/structured_cases.jsonl --index ./data/index.json --n $(or $(N),25) --out ./data/holdout_report.html
+
+# Backfill: publish indexable cases to the KB's S3 prefix and start a sync.
+# Needs S3_BUCKET_NAME (or BUCKET=...), BEDROCK_KB_ID, BEDROCK_DATA_SOURCE_ID.
+upload:
+	python -m oncall.publish.upload_cases --cases ./data/structured_cases.jsonl --bucket $(or $(BUCKET),$(S3_BUCKET_NAME)) --sync
 
 # Build console-uploadable zips for the two Lambdas. The entry file is named
 # lambda_function.py inside each zip, so the existing handler setting
