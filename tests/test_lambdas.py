@@ -252,6 +252,59 @@ class TestRebuildSources:
         out = questions._rebuild_sources(answer, _citations())
         assert out.count("p1787153577898639") == 1
 
+    def test_links_rebuilt_from_s3_location_when_chunks_have_none(self):
+        # Production case: chunks were split before the permalink field AND
+        # the model wrote only %[n]% markers — the S3 key still identifies
+        # the thread, so the link must be rebuilt from it.
+        from unittest.mock import patch
+
+        from oncall.lambdas import questions
+
+        citations = [
+            {
+                "retrievedReferences": [
+                    {
+                        "content": {"text": '{"is_resolved": true, "solution": "Fix the handler'},
+                        "location": {
+                            "s3Location": {
+                                "uri": "s3://bucket-on-call-post/cases/C09126VCR1P/1787358553.480719.json"
+                            },
+                            "type": "S3",
+                        },
+                    }
+                ]
+            }
+        ]
+        with patch.object(questions, "SLACK_WORKSPACE_URL", "https://personalvin.slack.com"):
+            out = questions._rebuild_sources("Answer.\n\nSources: \n- %[1]%", citations)
+        assert "https://personalvin.slack.com/archives/C09126VCR1P/p1787358553480719" in out
+        assert "%[" not in out
+
+    def test_location_and_chunk_link_for_same_case_dedupe(self):
+        from unittest.mock import patch
+
+        from oncall.lambdas import questions
+
+        citations = [
+            {
+                "retrievedReferences": [
+                    {
+                        "content": {
+                            "text": '"permalink": "https://personalvin.slack.com/archives/C09126VCR1P/p1787153577898639"'
+                        },
+                        "location": {
+                            "s3Location": {
+                                "uri": "s3://bucket-on-call-post/cases/C09126VCR1P/1787153577.898639.json"
+                            }
+                        },
+                    }
+                ]
+            }
+        ]
+        with patch.object(questions, "SLACK_WORKSPACE_URL", "https://personalvin.slack.com"):
+            out = questions._rebuild_sources("Answer.", citations)
+        assert out.count("p1787153577898639") == 1
+
 
 class TestKbAnswerPromptTemplate:
     def test_keeps_bedrock_placeholders(self):

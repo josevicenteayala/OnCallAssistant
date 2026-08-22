@@ -49,6 +49,9 @@ SLACK_BOT_TOKEN      = os.environ.get("SLACK_BOT_TOKEN", "")
 BEDROCK_KB_ID        = os.environ.get("BEDROCK_KB_ID", "")
 BEDROCK_MODEL_ARN    = os.environ.get("BEDROCK_MODEL_ARN", "")
 AWS_REGION_NAME      = os.environ.get("AWS_REGION_NAME", "us-east-2")
+# e.g. https://yourworkspace.slack.com — lets citations be rebuilt from the
+# case's S3 key alone (channel + thread_ts), independent of chunk contents
+SLACK_WORKSPACE_URL  = os.environ.get("SLACK_WORKSPACE_URL", "")
 
 # boto3 client is created lazily so the module imports cleanly (tests, tools)
 # without AWS credentials configured.
@@ -186,6 +189,8 @@ _NO_MATCH_ANSWER = (
 
 _PERMALINK_RE   = re.compile(r"https://[A-Za-z0-9.-]+\.slack\.com/archives/[A-Z0-9]+/p\d+")
 _CITE_MARKER_RE = re.compile(r"%\[\d+\]%")
+# Case objects are stored as {prefix}/{channel_id}/{thread_ts}.json
+_CASE_KEY_RE    = re.compile(r"/(C[A-Z0-9]+)/(\d+\.\d+)\.json$")
 
 
 def _normalize_answer(answer: str) -> str:
@@ -194,11 +199,36 @@ def _normalize_answer(answer: str) -> str:
     return answer
 
 
+def _permalink_from_location(ref: dict) -> str | None:
+    """Build the thread permalink from a citation's S3 key (channel + ts).
+
+    Deterministic and chunk-independent: works even when the retrieved chunk
+    was split before the JSON's permalink field. Needs SLACK_WORKSPACE_URL.
+    """
+    if not SLACK_WORKSPACE_URL:
+        return None
+    uri = ref.get("location", {}).get("s3Location", {}).get("uri", "")
+    m = _CASE_KEY_RE.search(uri)
+    if not m:
+        return None
+    channel_id, thread_ts = m.groups()
+    return (
+        f"{SLACK_WORKSPACE_URL.rstrip('/')}/archives/{channel_id}"
+        f"/p{thread_ts.replace('.', '')}"
+    )
+
+
 def _collect_permalinks(citations: list) -> list[str]:
-    """Slack permalinks found in the retrieved chunks, deduped, in order."""
+    """Slack permalinks for the retrieved cases, deduped, in order.
+
+    Prefers rebuilding each link from the citation's S3 location; falls back
+    to any permalink text present in the chunk contents."""
     links: list[str] = []
     for citation in citations:
         for ref in citation.get("retrievedReferences", []):
+            loc_link = _permalink_from_location(ref)
+            if loc_link and loc_link not in links:
+                links.append(loc_link)
             text = ref.get("content", {}).get("text", "")
             for link in _PERMALINK_RE.findall(text):
                 if link not in links:
