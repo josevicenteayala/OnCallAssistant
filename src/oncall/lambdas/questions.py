@@ -123,7 +123,10 @@ def _query_bedrock(enriched_question: str) -> tuple[str, int]:
                 "generationConfiguration": {
                     "promptTemplate": {
                         "textPromptTemplate": KB_ANSWER_PROMPT_TEMPLATE,
-                    }
+                    },
+                    "inferenceConfig": {
+                        "textInferenceConfig": {"temperature": 0},
+                    },
                 },
             },
         },
@@ -161,7 +164,10 @@ def _query_bedrock(enriched_question: str) -> tuple[str, int]:
     if not citations:
         _debug_retrieve(enriched_question)
 
-    return _normalize_answer(answer), len(citations)
+    answer = _normalize_answer(answer)
+    if citations:
+        answer = _rebuild_sources(answer, citations)
+    return answer, len(citations)
 
 
 # Bedrock's canned response when retrieve_and_generate declines to answer
@@ -173,10 +179,42 @@ _NO_MATCH_ANSWER = (
     "Please check the runbooks or escalate."
 )
 
+_PERMALINK_RE   = re.compile(r"https://[A-Za-z0-9.-]+\.slack\.com/archives/[A-Z0-9]+/p\d+")
+_CITE_MARKER_RE = re.compile(r"%\[\d+\]%")
+
 
 def _normalize_answer(answer: str) -> str:
     if answer.strip() == _CANNED_REFUSAL:
         return _NO_MATCH_ANSWER
+    return answer
+
+
+def _collect_permalinks(citations: list) -> list[str]:
+    """Slack permalinks found in the retrieved chunks, deduped, in order."""
+    links: list[str] = []
+    for citation in citations:
+        for ref in citation.get("retrievedReferences", []):
+            text = ref.get("content", {}).get("text", "")
+            for link in _PERMALINK_RE.findall(text):
+                if link not in links:
+                    links.append(link)
+    return links
+
+
+def _rebuild_sources(answer: str, citations: list) -> str:
+    """Replace the model-written Sources section with one built from citations.
+
+    The model only sometimes transcribes real URLs — other times it leaks its
+    internal citation markers (e.g. %[2]%). The retrieved chunks carry the
+    actual permalinks, so build the section deterministically from them.
+    """
+    idx = answer.rfind("Sources:")
+    if idx != -1:
+        answer = answer[:idx].rstrip()
+    answer = _CITE_MARKER_RE.sub("", answer).rstrip()
+    links = _collect_permalinks(citations)
+    if links:
+        answer += "\n\nSources:\n" + "\n".join(f"- {link}" for link in links)
     return answer
 
 

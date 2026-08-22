@@ -183,6 +183,51 @@ class TestNormalizeAnswer:
         assert questions._normalize_answer("Roll back the deploy. [1]") == "Roll back the deploy. [1]"
 
 
+def _citations():
+    return [
+        {
+            "retrievedReferences": [
+                {"content": {"text": 'chunk without permalink, split mid-JSON'}},
+                {"content": {"text": '"permalink": "https://personalvin.slack.com/archives/C09126VCR1P/p1787153577898639"'}},
+            ]
+        },
+        {
+            "retrievedReferences": [
+                # same case retrieved twice — must dedupe
+                {"content": {"text": 'again https://personalvin.slack.com/archives/C09126VCR1P/p1787153577898639'}},
+            ]
+        },
+    ]
+
+
+class TestRebuildSources:
+    def test_replaces_leaked_citation_markers_with_real_links(self):
+        from oncall.lambdas import questions
+
+        answer = "Pause the consumer.\n\nSources: \n- %[2]%\n- %[3]%"
+        out = questions._rebuild_sources(answer, _citations())
+        assert "%[" not in out
+        assert out.count("https://personalvin.slack.com/archives/C09126VCR1P/p1787153577898639") == 1
+        assert out.startswith("Pause the consumer.")
+        assert "Sources:" in out
+
+    def test_appends_sources_when_model_wrote_none(self):
+        from oncall.lambdas import questions
+
+        out = questions._rebuild_sources("Just an answer.", _citations())
+        assert "Sources:" in out
+        assert "p1787153577898639" in out
+
+    def test_no_permalinks_found_drops_sources_section(self):
+        from oncall.lambdas import questions
+
+        citations = [{"retrievedReferences": [{"content": {"text": "no links here"}}]}]
+        out = questions._rebuild_sources("Answer.\n\nSources: \n- %[1]%", citations)
+        assert "Sources:" not in out
+        assert "%[" not in out
+        assert out.strip() == "Answer."
+
+
 class TestKbAnswerPromptTemplate:
     def test_keeps_bedrock_placeholders(self):
         from oncall.prompts import KB_ANSWER_PROMPT_TEMPLATE
