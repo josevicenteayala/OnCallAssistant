@@ -72,16 +72,22 @@ loads the channel's history so the bot is useful from day one:
    `data/validation_report.html`; tune the prompt/cutoff before spending on
    the full corpus.
 3. `make extract LIMIT=0 && make validate` — full extraction.
-4. Upload the indexable cases to `s3://<bucket>/cases/` as one JSON object per
-   case, keyed `{channel_id}/{thread_ts}.json` to match the live path's
-   layout (small uploader script — not written yet), then **Sync** the KB
-   data source.
+4. `make upload BUCKET=<bucket>` — publishes each indexable case to
+   `s3://<bucket>/cases/{channel_id}/{thread_ts}.json` (the live path's exact
+   key layout, so a later live re-resolution overwrites its backfilled case
+   instead of duplicating it) and starts a KB ingestion job. Add `--dry-run`
+   via the module form to preview:
+   `python -m oncall.publish.upload_cases --cases ./data/structured_cases.jsonl --bucket <bucket> --dry-run`
 5. `make index && make holdout` — hit-rate on held-out incidents vs the
    **60% go/no-go bar** (`data/holdout_report.html`). This number is the
    evidence for rolling out to the real on-call team.
 
 Before backfilling a real channel, delete any test cases from `cases/` and
 re-sync so experiment chatter doesn't pollute retrieval.
+
+Steps 1 and 3–4 need credentials: `SLACK_BOT_TOKEN` for the export, and AWS
+credentials (plus Bedrock model access) for extraction and upload. Steps 2 and
+the uploader's `--dry-run` run offline.
 
 ## Where this sits in the plan
 
