@@ -15,11 +15,14 @@ confidence-gated auto-posts. Full design in `docs/design-v2.md`.
 - `src/oncall/eval/`      validation report (step 4) + `holdout.py` retrieval
                           evaluation (the §5 go/no-go, `make holdout`)
 - `src/oncall/retrieval/` answer prompt + CLI (read path, local RAG — built)
-- `src/oncall/lambdas/`   **deployed live track**: `post_events.py` (Events API
-                          ingestion → S3 → extraction on resolution → KB sync),
-                          `questions.py` (@-mention → KB answer with permalink
-                          citations), `live_extract.py`, `slack_verify.py`.
-                          See its README for deployment/env details.
+- `src/oncall/lambdas/`   **deployed live track, verified end-to-end 2026-08-21**:
+                          `post_events.py` (Events API ingestion → S3 →
+                          extraction on resolution → KB sync), `questions.py`
+                          (@-mention → KB answer, citations rebuilt in code),
+                          `live_extract.py`, `slack_verify.py`. Its README is
+                          the ops runbook: env vars, IAM, timeouts (60s!),
+                          troubleshooting table. Deploys via `make lambda_zips`
+                          + console zip upload — never edit only in the console.
 - `src/oncall/bot/`       trigger classifier + confidence gate for auto-post (Phase 1)
 - `src/oncall/prompts.py` all LLM prompts live here, versioned
 - `infra/terraform/`      import flow for the existing Lambda (see its README);
@@ -57,5 +60,9 @@ Config via env vars (`.env.example`): `SLACK_BOT_TOKEN`, `AWS_REGION`,
   the deployed zip work.
 
 ## Roadmap pointer
-PoC (steps 1–4, here now) → MVP (live ingest + bot + shadow auto-post) →
+PoC: built. MVP: live ingest + extraction + on-demand bot are deployed and
+verified; **next up is the backfill milestone** (README "Backfill the
+knowledge base" — needs a small uploader script for cases → S3) and the first
+`make holdout` hit-rate vs the 60% bar. After that: trigger classifier +
+shadow-mode auto-post (`src/oncall/bot/`), 👍/👎 capture, kill switch, then
 go-live/harden → evolve (Datadog/ArgoCD, AgentCore). See `docs/design-v2.md` §8.
