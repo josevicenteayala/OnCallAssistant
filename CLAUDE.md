@@ -58,6 +58,7 @@ Config via env vars (`.env.example`): `SLACK_BOT_TOKEN`, `AWS_REGION`,
 - Lambda modules import helpers with a flat-zip fallback (`try: from
   oncall... except ImportError`) — keep that pattern so both the package and
   the deployed zip work.
+- **Lambda Structured Observability**: Handlers follow step-indexed structured logging (`[step=N]`), propagate `request_id`, track step and total execution duration (`duration_ms`), and log full exceptions via `logger.exception()`.
 
 ## Roadmap pointer
 PoC: built. MVP: live ingest + extraction + on-demand bot are deployed and
