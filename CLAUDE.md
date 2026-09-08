@@ -14,6 +14,9 @@ confidence-gated auto-posts. Full design in `docs/design-v2.md`.
                           `parsing.py` is shared with the live path
 - `src/oncall/eval/`      validation report (step 4) + `holdout.py` retrieval
                           evaluation (the §5 go/no-go, `make holdout`)
+- `src/oncall/publish/`   `upload_cases.py` — publishes indexable cases to the
+                          KB's S3 prefix in the live path's key layout
+                          (`make upload`), then starts an ingestion job
 - `src/oncall/retrieval/` answer prompt + CLI (read path, local RAG — built)
 - `src/oncall/lambdas/`   **deployed live track, verified end-to-end 2026-08-21**:
                           `post_events.py` (Events API ingestion → S3 →
@@ -51,6 +54,9 @@ Config via env vars (`.env.example`): `SLACK_BOT_TOKEN`, `AWS_REGION`,
 - **Don't index low-signal cases**: only `is_resolved` and `confidence >= 0.4`
   (cutoff is tunable — see the validation report).
 - **`make test && make lint` must pass before committing.**
+- Releases follow `.agents/rules/git-workflow.md`: fetch and rebase before
+  tagging, annotated tags matching the `pyproject.toml` version, and never
+  push a tag before its commit is on the remote branch.
 - New prompts go in `prompts.py`; new pipeline stages get their own subpackage
   plus a test.
 - **The Knowledge Base indexes only `cases/` (extracted, redacted, gated).**
@@ -62,8 +68,10 @@ Config via env vars (`.env.example`): `SLACK_BOT_TOKEN`, `AWS_REGION`,
 
 ## Roadmap pointer
 PoC: built. MVP: live ingest + extraction + on-demand bot are deployed and
-verified; **next up is the backfill milestone** (README "Backfill the
-knowledge base" — needs a small uploader script for cases → S3) and the first
-`make holdout` hit-rate vs the 60% bar. After that: trigger classifier +
-shadow-mode auto-post (`src/oncall/bot/`), 👍/👎 capture, kill switch, then
-go-live/harden → evolve (Datadog/ArgoCD, AgentCore). See `docs/design-v2.md` §8.
+verified, and the backfill tooling shipped in v0.2.0 (`make export` →
+`make pipeline` → `make upload`). **Next up: actually run the backfill on real
+channel history** (README "Backfill the knowledge base") and get the first
+`make holdout` hit-rate vs the 60% bar — that number gates rollout. After
+that: trigger classifier + shadow-mode auto-post (`src/oncall/bot/`), 👍/👎
+capture, kill switch, then go-live/harden → evolve (Datadog/ArgoCD,
+AgentCore). See `docs/design-v2.md` §8.

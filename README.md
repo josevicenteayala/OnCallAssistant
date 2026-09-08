@@ -15,6 +15,7 @@ src/oncall/
   ingest/      slack_export.py, normalize.py     write path: steps 1–2
   extract/     extract.py, parsing.py (Bedrock)  write path: step 3
   eval/        validate.py, holdout.py           step 4 + §5 go/no-go eval
+  publish/     upload_cases.py                   cases -> S3 `cases/` + KB sync
   retrieval/   answer prompt + CLI               read path (local RAG — built)
   lambdas/     deployed live track: Events-API ingestion + @-mention bot
   bot/         trigger classifier, gate          Phase 1

@@ -7,6 +7,7 @@
 | [`extraction-prompt.md`](extraction-prompt.md) | Annotated spec for the extraction prompt with worked examples. The executable copy lives in [`../src/oncall/prompts.py`](../src/oncall/prompts.py). | Spec |
 | [`../src/oncall/lambdas/README.md`](../src/oncall/lambdas/README.md) | Live-track ops runbook: env vars, IAM, timeouts, deployment, troubleshooting table. | Runbook |
 | [`oncall-assistant-poc.html`](oncall-assistant-poc.html) | Six-slide stakeholder walkthrough. Open in a browser. | Deck |
+| [`OnCallAssistant-Infrastructure-Guide.pdf`](OnCallAssistant-Infrastructure-Guide.pdf) | **Client-facing**: everything a customer platform team needs to recreate the system in their own AWS account and Slack workspace — resource inventory, IAM, Slack app setup, deployment order, smoke test, troubleshooting. Regenerable source in [`infrastructure-guide/`](infrastructure-guide/); read its README before sending to a client. | Deliverable |
 
 ## Diagrams
 
