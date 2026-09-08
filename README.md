@@ -6,7 +6,8 @@ likely solutions for new incidents — answering engineers on demand and posting
 confidence-gated suggestions into new issue threads.
 
 > Full design: [`docs/design-v2.md`](docs/design-v2.md) · extraction prompt spec:
-> [`docs/extraction-prompt.md`](docs/extraction-prompt.md)
+> [`docs/extraction-prompt.md`](docs/extraction-prompt.md) · release history:
+> [`CHANGELOG.md`](CHANGELOG.md)
 
 ## Structure
 
@@ -103,4 +104,6 @@ criteria is in `docs/design-v2.md` §8.
 
 Secrets only via env / a secret manager — never committed. Fix extraction quality
 in `prompts.py`, never by hand-editing data. `make test && make lint` before
-committing. More in [`CLAUDE.md`](CLAUDE.md).
+committing. Notable changes go in [`CHANGELOG.md`](CHANGELOG.md) under
+`Unreleased`; releases follow `.agents/rules/git-workflow.md`. More in
+[`CLAUDE.md`](CLAUDE.md).

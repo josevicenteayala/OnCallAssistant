@@ -57,6 +57,8 @@ Config via env vars (`.env.example`): `SLACK_BOT_TOKEN`, `AWS_REGION`,
 - Releases follow `.agents/rules/git-workflow.md`: fetch and rebase before
   tagging, annotated tags matching the `pyproject.toml` version, and never
   push a tag before its commit is on the remote branch.
+- Notable changes go in `CHANGELOG.md` under `Unreleased`; on release, rename
+  that heading to the version and open a fresh `Unreleased`.
 - New prompts go in `prompts.py`; new pipeline stages get their own subpackage
   plus a test.
 - **The Knowledge Base indexes only `cases/` (extracted, redacted, gated).**
